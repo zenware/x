@@ -8,6 +8,7 @@ locations = "src", "tests", "noxfile.py"
 
 def install_with_constraints(session, *args, **kwargs):
     with tempfile.NamedTemporaryFile() as requirements:
+        session.run("poetry", "install", "--no-dev", external=True)
         session.run(
             "poetry",
             "export",
@@ -21,17 +22,19 @@ def install_with_constraints(session, *args, **kwargs):
 
 @nox.session(python="3.8")
 def safety(session):
+    # Why in the world do all this template work,
+    # and have a method built in to do it for us.
     with tempfile.NamedTemporaryFile() as requirements:
         session.run(
             "poetry",
             "export",
             "--dev",
             "--format=requirements.txt",
-            "--without-hashes",
+            "--without-hashes",  # Not sure why I need without hashes here
             f"--output={requirements.name}",
             external=True,
         )
-        session.install("safety")
+        install_with_constraints(session, "safety")
         session.run("safety", "check", f"--file={requirements.name}", "--full-report")
 
 
