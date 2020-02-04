@@ -1,0 +1,46 @@
+[tool.poetry]
+name = "test-hypermodern-python"
+version = "0.1.0"
+description = "A test project where I'm following along with the Hypermodern Python Blog Posts"
+authors = ["Jay Looney <jay.m.looney@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/zenware/test-hypermodern-python"
+repository = "https://github.com/zenware/test-hypermodern-python"
+keywords = ["hypermodern", "test", "dev"]
+
+[tool.poetry.scripts]
+hypermodern-python = "test_hypermodern_python.console:main"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+click = "^7.0"
+requests = "^2.22.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.3.5"
+coverage = {extras = ["toml"], version = "^5.0.3"}
+pytest-cov = "^2.8.1"
+nox = "^2019.11.9"
+pytest-mock = "^2.0.0"
+black = "^19.10b0"
+flake8 = "^3.7.9"
+flake8-bandit = "^2.1.2"
+flake8-black = "^0.1.1"
+flake8-bugbear = "^20.1.4"
+flake8-import-order = "^0.18.1"
+safety = "^1.8.5"
+pre-commit = "^2.0.1"
+
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["test_hypermodern_python"]
+
+[tool.coverage.report]
+show_missing = true
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
