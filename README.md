@@ -22,3 +22,12 @@ PowerShell-based user data backup script for Windows desktops, laptops, and home
 - [ ] Mount NAS or Attach External Drive
 - [ ] Confirm Target Path is Accessible
 - [ ] Ensure sufficient disk space
+
+**Note:** These scripts generally need to run in an elevated PowerShell session
+so they can access registry hives and protected system folders.
+
+## Restore Usage
+
+```powershell
+./restore.ps1 -User jml -BackupPath D:\Backups\jml -Tasks Documents,Registry
+```
