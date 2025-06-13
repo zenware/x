@@ -28,7 +28,7 @@ function Restore-AppData {
             New-Item -ItemType Directory -Path $dst -Force | Out-Null
             Copy-Item -Path $src -Destination $dst -Recurse -Force -ErrorAction Stop
         } catch {
-            Write-Log "Failed to restore AppData $sub: $_" "Error"
+            Write-Log "Failed to restore AppData ${sub}: $_" "Error"
         }
     }
 }
