@@ -49,7 +49,7 @@ function Backup-Browsers {
                     throw "Robocopy failure"
                 }
             } catch {
-                Write-Log "Exception during robocopy of $browser: $_" "Error"
+                Write-Log "Exception during robocopy of ${browser}: $_" "Error"
             }
         } else {
             Write-Log "$browser profile not found - skipping" "Warning"

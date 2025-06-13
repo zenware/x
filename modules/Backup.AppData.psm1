@@ -43,7 +43,7 @@ function Backup-AppData {
                     throw "Robocopy failure"
                 }
             } catch {
-                Write-Log "Exception during robocopy of AppData $sub: $_" "Error"
+                Write-Log "Exception during robocopy of AppData ${sub}: $_" "Error"
             }
         } else {
             Write-Log "Missing AppData $sub - skipping" "Warning"
