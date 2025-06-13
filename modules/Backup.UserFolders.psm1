@@ -53,7 +53,7 @@ function Backup-Documents {
         $Destination = Join-Path $TargetRoot "UserFolders/$folder"
         
         if (-not (Test-Path $Source)) {
-            Write-Log "Skipping missing folder: $Source'" "Warning"
+            Write-Log "Skipping missing folder: $Source" "Warning"
             continue
         }
         
