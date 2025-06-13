@@ -58,6 +58,8 @@ $RegisteredTasks = @{
     "UserFolders"     = { Restore-UserFolders -BackupRoot $BackupPath -RestoreRoot $RestoreRoot }
     "Registry"        = { Restore-Registry -BackupRoot $BackupPath -User $User }
     "PackageManagers" = { Restore-PackageManagers -BackupRoot $BackupPath -Staging:$Staging }
+    "Browsers"        = { Restore-Browsers -BackupRoot $BackupPath -RestoreRoot $RestoreRoot }
+    "AppData"         = { Restore-AppData -BackupRoot $BackupPath -RestoreRoot $RestoreRoot }
 }
 
 if (-not $Tasks) {
