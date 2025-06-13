@@ -22,10 +22,11 @@ function Backup-PackageManagers {
     }
 
     # Scoop
-    if (Test-Path "$env:USERPROFILE\scoop\shims\scoop.cmd") {
+    $scoopCmd = Join-Path $ProfileRoot 'scoop\shims\scoop.cmd'
+    if (Test-Path $scoopCmd) {
         try {
             Write-Log "Exporting Scoop packages"
-            & "$env:USERPROFILE\scoop\shims\scoop.cmd" list | Out-File -Encoding UTF8 -FilePath (Join-Path $exportRoot "scoop.txt")
+            & $scoopCmd list | Out-File -Encoding UTF8 -FilePath (Join-Path $exportRoot "scoop.txt")
         } catch {
             Write-Log "Failed to export Scoop packages: $_" "Error"
         }
