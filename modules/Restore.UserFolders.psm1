@@ -1,3 +1,4 @@
+# Uses robocopy for large folder copies. Operations may take a while on big datasets.
 function Restore-UserFolders {
     [CmdletBinding()]
     param (
@@ -23,7 +24,32 @@ function Restore-UserFolders {
 
         try {
             Write-Log "Copying $($_.Name) to $dst"
-            Copy-Item -Path $src -Destination $dst -Recurse -Force -ErrorAction Stop
+
+            $logicalCores = [Environment]::ProcessorCount
+            $threadCount = [Math]::Max(1, [Math]::Floor($logicalCores / 2))
+            $options = @(
+                "/MIR",
+                "/Z",
+                "/R:3",
+                "/W:5",
+                "/NP",
+                "/NFL",
+                "/NDL",
+                "/MT:$threadCount"
+            ) -join " "
+
+            $startInfo = @{
+                FilePath    = "robocopy.exe"
+                ArgumentList = "`"$src`" `"$dst`" $options"
+                NoNewWindow = $true
+                Wait        = $true
+                PassThru    = $true
+            }
+            $proc = Start-Process @startInfo
+            if ($proc.ExitCode -gt 7) {
+                Write-Log "Robocopy failed for $($_.Name) (exit code $($proc.ExitCode))" "Error"
+                throw "Robocopy failure"
+            }
         } catch {
             Write-Log "Failed to restore folder $($_.Name): $_" "Error"
         }
