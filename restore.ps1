@@ -35,14 +35,27 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 Import-Module "$PSScriptRoot\helpers\Logging.psm1" -Force
+Import-Module "$PSScriptRoot\helpers\Validations.psm1" -Force
 
 # Dynamically load restore modules
 Get-ChildItem "$PSScriptRoot\modules" -Filter "Restore.*.psm1" | ForEach-Object {
     Import-Module $_.FullName -Force
 }
 
+# Validate backup path exists before initializing logging
+if (-not (Test-Path $BackupPath)) {
+    throw "Backup path '$BackupPath' does not exist."
+}
+
 $LogPath = Join-Path $BackupPath "logs"
 Start-Log -LogDirectory $LogPath -Prefix "restore_$User"
+
+# Validate destination user account
+try {
+    Test-UserExists $User
+} catch {
+    Write-Log "User '$User' does not exist. Restoring to new account." "Warning"
+}
 
 Write-Log "Starting restore for user: $User"
 Write-Log "Backup path: $BackupPath"
