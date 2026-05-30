@@ -11,6 +11,18 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
-  sendResponse(buildWatchLaterPageScanResponse(document, window.location.href));
-  return false;
+  void buildWatchLaterPageScanResponse(document, window.location.href, message.loadAll === true)
+    .then((response) => {
+      sendResponse(response);
+    })
+    .catch((error: unknown) => {
+      const messageText = error instanceof Error ? error.message : "Unable to scan the Watch Later page.";
+      sendResponse({
+        type: "watch-later/scan-result",
+        ok: false,
+        message: messageText
+      });
+    });
+
+  return true;
 });

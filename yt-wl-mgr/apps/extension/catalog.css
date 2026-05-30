@@ -141,7 +141,7 @@ body {
 }
 
 .controls {
-  grid-template-columns: minmax(240px, 2fr) repeat(2, minmax(170px, 1fr)) auto;
+  grid-template-columns: minmax(240px, 2fr) repeat(4, minmax(170px, 1fr)) auto;
   align-items: end;
   padding: 16px;
   margin-bottom: 16px;
@@ -338,7 +338,25 @@ body {
   width: fit-content;
 }
 
-.visually-hidden {
+.detail-enriched {
+  margin-top: 20px;
+}
+
+.detail-enriched h3 {
+  margin: 0 0 10px;
+}
+
+.detail-description {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.detail-field--full {
+  grid-column: 1 / -1;
+}
+
+
   position: absolute;
   width: 1px;
   height: 1px;

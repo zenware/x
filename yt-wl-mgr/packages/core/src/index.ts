@@ -47,6 +47,7 @@ export type CatalogItem = {
   importCount: number;
   sourceSnapshotFingerprints: string[];
   sourcePlaylistTitles: string[];
+  enrichedMetadata?: EnrichedVideoMetadata;
 };
 
 export type CatalogStore = {
@@ -75,6 +76,7 @@ export type CatalogImportRecency = "all" | "7d" | "30d" | "older";
 
 export type EnrichedVideoMetadata = {
   videoId: string;
+  enrichedAt: string;
   publishedAt?: string;
   description?: string;
   tags?: string[];
@@ -225,10 +227,60 @@ function parseWatchLaterVideo(value: unknown, index: number): WatchLaterVideo {
   });
 }
 
+function parseEnrichedVideoMetadata(value: unknown): EnrichedVideoMetadata | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const videoId = typeof value.videoId === "string" ? value.videoId.trim() : undefined;
+  const enrichedAt = typeof value.enrichedAt === "string" ? value.enrichedAt.trim() : undefined;
+
+  if (!videoId || !enrichedAt) {
+    return undefined;
+  }
+
+  const privacyStatusOptions = ["public", "private", "unlisted", "unknown"] as const;
+  const availabilityStatusOptions = ["available", "deleted", "unavailable", "unknown"] as const;
+
+  const publishedAt = typeof value.publishedAt === "string" ? value.publishedAt.trim() || undefined : undefined;
+  const description = typeof value.description === "string" ? value.description.trim() || undefined : undefined;
+  const tags = Array.isArray(value.tags)
+    ? (value.tags as unknown[]).filter((t): t is string => typeof t === "string")
+    : undefined;
+  const privacyStatus = privacyStatusOptions.includes(value.privacyStatus as never)
+    ? (value.privacyStatus as EnrichedVideoMetadata["privacyStatus"])
+    : undefined;
+  const availabilityStatus = availabilityStatusOptions.includes(value.availabilityStatus as never)
+    ? (value.availabilityStatus as EnrichedVideoMetadata["availabilityStatus"])
+    : undefined;
+  const viewCount = typeof value.viewCount === "number" ? value.viewCount : undefined;
+  const likeCount = typeof value.likeCount === "number" ? value.likeCount : undefined;
+  const commentCount = typeof value.commentCount === "number" ? value.commentCount : undefined;
+
+  return {
+    videoId,
+    enrichedAt,
+    ...(publishedAt !== undefined ? { publishedAt } : {}),
+    ...(description !== undefined ? { description } : {}),
+    ...(tags !== undefined ? { tags } : {}),
+    ...(privacyStatus !== undefined ? { privacyStatus } : {}),
+    ...(availabilityStatus !== undefined ? { availabilityStatus } : {}),
+    ...(viewCount !== undefined ? { viewCount } : {}),
+    ...(likeCount !== undefined ? { likeCount } : {}),
+    ...(commentCount !== undefined ? { commentCount } : {})
+  };
+}
+
 function parseCatalogItem(value: unknown, index: number): CatalogItem {
   if (!isRecord(value)) {
     throw new Error(`catalog.items[${index}] must be an object.`);
   }
+
+  const enrichedMetadata = parseEnrichedVideoMetadata(value.enrichedMetadata);
 
   return {
     videoId: readRequiredString(value, "videoId", `catalog.items[${index}].videoId`),
@@ -237,7 +289,8 @@ function parseCatalogItem(value: unknown, index: number): CatalogItem {
     lastImportedAt: readRequiredString(value, "lastImportedAt", `catalog.items[${index}].lastImportedAt`),
     importCount: readRequiredNumber(value, "importCount", `catalog.items[${index}].importCount`),
     sourceSnapshotFingerprints: readStringArray(value, "sourceSnapshotFingerprints", `catalog.items[${index}].sourceSnapshotFingerprints`),
-    sourcePlaylistTitles: readStringArray(value, "sourcePlaylistTitles", `catalog.items[${index}].sourcePlaylistTitles`)
+    sourcePlaylistTitles: readStringArray(value, "sourcePlaylistTitles", `catalog.items[${index}].sourcePlaylistTitles`),
+    ...(enrichedMetadata !== undefined ? { enrichedMetadata } : {})
   };
 }
 
@@ -297,7 +350,8 @@ function mergeCatalogItem(
     lastImportedAt: importedAt > current.lastImportedAt ? importedAt : current.lastImportedAt,
     importCount: current.importCount + 1,
     sourceSnapshotFingerprints: normalizeStringList([...current.sourceSnapshotFingerprints, fingerprint]),
-    sourcePlaylistTitles: normalizeStringList([...current.sourcePlaylistTitles, snapshot.playlistTitle])
+    sourcePlaylistTitles: normalizeStringList([...current.sourcePlaylistTitles, snapshot.playlistTitle]),
+    ...(current.enrichedMetadata !== undefined ? { enrichedMetadata: current.enrichedMetadata } : {})
   };
 }
 
@@ -539,4 +593,20 @@ export function matchesImportRecency(
   }
 
   return ageMs > 30 * dayMs;
+}
+
+export function applyEnrichedMetadata(
+  catalog: CatalogStore,
+  videoId: string,
+  metadata: EnrichedVideoMetadata
+): CatalogStore {
+  const items = catalog.items.map((item) =>
+    item.videoId === videoId ? { ...item, enrichedMetadata: metadata } : item
+  );
+
+  return {
+    ...catalog,
+    items,
+    updatedAt: new Date().toISOString()
+  };
 }

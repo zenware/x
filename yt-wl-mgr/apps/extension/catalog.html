@@ -12,7 +12,7 @@
         <div>
           <p class="eyebrow">WLM-002 · WLM-003 · WLM-004</p>
           <h1>Watch Later catalog</h1>
-          <p class="page-header__lede">Import exported snapshots, keep them in extension storage, and browse your backlog locally.</p>
+          <p class="page-header__lede">Import or export snapshots, keep them in extension storage, and browse your backlog locally.</p>
         </div>
 
         <div class="page-header__actions">
@@ -20,6 +20,8 @@
             Import snapshots
             <input class="visually-hidden" data-role="file-input" type="file" accept=".json,application/json" multiple>
           </label>
+          <button class="button button--secondary" type="button" data-role="export-snapshots-button">Export snapshots</button>
+          <button class="button button--secondary" type="button" data-role="enrich-all-button">Fetch metadata</button>
           <button class="button button--secondary" type="button" data-role="reload-button">Reload</button>
         </div>
       </header>
@@ -68,6 +70,24 @@
           </select>
         </label>
 
+        <label class="field">
+          <span>Playlist source</span>
+          <select data-role="playlist-filter">
+            <option value="all">Any playlist</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Sort</span>
+          <select data-role="sort-order">
+            <option value="recent">Recently imported</option>
+            <option value="oldest">Oldest import first</option>
+            <option value="title">Title (A–Z)</option>
+            <option value="channel">Channel (A–Z)</option>
+            <option value="import-count">Most snapshots</option>
+          </select>
+        </label>
+
         <button class="button button--ghost" type="button" data-role="clear-filters">Clear filters</button>
       </section>
 
@@ -87,7 +107,7 @@
 
           <div class="empty-state" data-role="no-results-state" hidden>
             <h3>No matches</h3>
-            <p>Try a different search term, or clear the duration and recency filters.</p>
+            <p>Try a different search term, playlist source, or reset your filters.</p>
           </div>
 
           <ul class="item-list" data-role="item-list"></ul>

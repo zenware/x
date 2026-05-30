@@ -40,6 +40,7 @@ export type WatchLaterPageScan = {
 
 export type PageScanRequest = {
   type: "watch-later/scan-page";
+  loadAll?: boolean;
 };
 
 export type PageScanResponse = {
