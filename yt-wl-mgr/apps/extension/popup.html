@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YT Watch Later Manager</title>
+    <link rel="stylesheet" href="./popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="popup__header">
+        <p class="eyebrow">WLM-001 · WLM-002</p>
+        <h1>YouTube Watch Later Manager</h1>
+        <span class="status-badge" data-role="status-badge" data-state="warning">Checking…</span>
+      </header>
+
+      <p class="status-text" data-role="status-text">Checking the active tab…</p>
+      <p class="hint-text" data-role="hint-text">Open your Watch Later playlist to save snapshots into the local catalog.</p>
+
+      <div class="actions">
+        <button class="button button--primary actions__export" type="button" data-role="export-button" disabled>Save snapshot to catalog</button>
+        <button class="button button--secondary" type="button" data-role="refresh-button">Refresh</button>
+        <button class="button button--secondary" type="button" data-role="open-catalog-button">Open catalog</button>
+      </div>
+
+      <p class="result-text" data-role="result-text">Save a normalized snapshot directly into local catalog storage.</p>
+    </main>
+
+    <script src="./dist/apps/extension/src/popup.js"></script>
+  </body>
+</html>

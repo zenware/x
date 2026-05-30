@@ -1,0 +1,21 @@
+{
+  "name": "yt-wl-mgr",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm --workspaces --if-present run build",
+    "typecheck": "npm --workspaces --if-present run typecheck",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
