@@ -4,16 +4,21 @@ import {
   matchesImportRecency,
   mergeSnapshotIntoCatalog,
   parseWatchLaterSnapshot,
+  applyEnrichedMetadata,
   type CatalogDurationBucket,
   type CatalogImportRecency,
   type CatalogItem,
   type CatalogStore,
+  type EnrichedVideoMetadata,
   type SnapshotImportRecord
 } from "../../../packages/core/src/index.js";
 import { loadCatalogStore, saveCatalogStore } from "./catalogStorage.js";
+import { fetchVideoEnrichment } from "./videoEnrichment.js";
 
 type DurationFilter = CatalogDurationBucket | "all";
 type RecencyFilter = CatalogImportRecency;
+type PlaylistFilter = "all" | string;
+type SortOrder = "recent" | "oldest" | "title" | "channel" | "import-count";
 type MessageKind = "success" | "error" | "info";
 
 type UiMessage = {
@@ -21,23 +26,37 @@ type UiMessage = {
   text: string;
 };
 
+type EnrichProgress = {
+  total: number;
+  completed: number;
+  failed: number;
+};
+
 type CatalogPageState = {
   catalog: CatalogStore;
   searchQuery: string;
   durationFilter: DurationFilter;
   recencyFilter: RecencyFilter;
+  playlistFilter: PlaylistFilter;
+  sortOrder: SortOrder;
   selectedVideoId: string | undefined;
   isBusy: boolean;
   messages: UiMessage[];
   fatalError: string | undefined;
+  enrichProgress: EnrichProgress | null;
+  enrichingVideoId: string | undefined;
 };
 
 const fileInput = requireElement<HTMLInputElement>("[data-role='file-input']");
 const importButton = requireElement<HTMLLabelElement>("[data-role='import-button']");
+const exportSnapshotsButton = requireElement<HTMLButtonElement>("[data-role='export-snapshots-button']");
+const enrichAllButton = requireElement<HTMLButtonElement>("[data-role='enrich-all-button']");
 const reloadButton = requireElement<HTMLButtonElement>("[data-role='reload-button']");
 const searchInput = requireElement<HTMLInputElement>("[data-role='search-input']");
 const durationFilterSelect = requireElement<HTMLSelectElement>("[data-role='duration-filter']");
 const recencyFilterSelect = requireElement<HTMLSelectElement>("[data-role='recency-filter']");
+const playlistFilterSelect = requireElement<HTMLSelectElement>("[data-role='playlist-filter']");
+const sortOrderSelect = requireElement<HTMLSelectElement>("[data-role='sort-order']");
 const clearFiltersButton = requireElement<HTMLButtonElement>("[data-role='clear-filters']");
 const statusPanel = requireElement<HTMLElement>("[data-role='status-panel']");
 const totalItemsValue = requireElement<HTMLElement>("[data-role='total-items']");
@@ -54,10 +73,14 @@ const initialState: CatalogPageState = {
   searchQuery: "",
   durationFilter: "all",
   recencyFilter: "all",
+  playlistFilter: "all",
+  sortOrder: "recent",
   selectedVideoId: undefined,
   isBusy: false,
   messages: [],
-  fatalError: undefined
+  fatalError: undefined,
+  enrichProgress: null,
+  enrichingVideoId: undefined
 };
 
 const state: CatalogPageState = { ...initialState };
@@ -101,6 +124,8 @@ function updateSelectedVideoId(videoId: string | undefined): void {
 function setBusy(isBusy: boolean): void {
   state.isBusy = isBusy;
   fileInput.disabled = isBusy || Boolean(state.fatalError);
+  exportSnapshotsButton.disabled = isBusy || Boolean(state.fatalError);
+  enrichAllButton.disabled = isBusy || Boolean(state.fatalError) || Boolean(state.enrichProgress);
   reloadButton.disabled = isBusy;
   importButton.dataset.disabled = String(fileInput.disabled);
 }
@@ -141,25 +166,80 @@ function resetFilters(): void {
   state.searchQuery = "";
   state.durationFilter = "all";
   state.recencyFilter = "all";
+  state.playlistFilter = "all";
+  state.sortOrder = "recent";
   searchInput.value = "";
   durationFilterSelect.value = "all";
   recencyFilterSelect.value = "all";
+  playlistFilterSelect.value = "all";
+  sortOrderSelect.value = "recent";
   render();
+}
+
+function sortCatalogItems(items: CatalogItem[]): CatalogItem[] {
+  const nextItems = [...items];
+
+  if (state.sortOrder === "recent") {
+    return nextItems.sort((left, right) => right.lastImportedAt.localeCompare(left.lastImportedAt));
+  }
+
+  if (state.sortOrder === "oldest") {
+    return nextItems.sort((left, right) => left.lastImportedAt.localeCompare(right.lastImportedAt));
+  }
+
+  if (state.sortOrder === "title") {
+    return nextItems.sort((left, right) => left.video.title.localeCompare(right.video.title));
+  }
+
+  if (state.sortOrder === "channel") {
+    return nextItems.sort((left, right) => left.video.channelName.localeCompare(right.video.channelName));
+  }
+
+  return nextItems.sort((left, right) => right.importCount - left.importCount);
 }
 
 function getFilteredItems(): CatalogItem[] {
   const normalizedQuery = state.searchQuery.trim().toLocaleLowerCase();
-
-  return state.catalog.items.filter((item) => {
+  const filteredItems = state.catalog.items.filter((item) => {
     const matchesQuery = normalizedQuery.length === 0
       || item.video.title.toLocaleLowerCase().includes(normalizedQuery)
       || item.video.channelName.toLocaleLowerCase().includes(normalizedQuery);
     const matchesDuration = state.durationFilter === "all"
       || getDurationBucket(item.video.durationText) === state.durationFilter;
     const matchesRecency = matchesImportRecency(item.lastImportedAt, state.recencyFilter);
+    const matchesPlaylist = state.playlistFilter === "all"
+      || item.sourcePlaylistTitles.includes(state.playlistFilter);
 
-    return matchesQuery && matchesDuration && matchesRecency;
+    return matchesQuery && matchesDuration && matchesRecency && matchesPlaylist;
   });
+
+  return sortCatalogItems(filteredItems);
+}
+
+function renderPlaylistFilterOptions(): void {
+  const playlistTitles = Array.from(
+    new Set(state.catalog.items.flatMap((item) => item.sourcePlaylistTitles))
+  ).sort((left, right) => left.localeCompare(right));
+
+  playlistFilterSelect.replaceChildren();
+
+  const anyPlaylistOption = document.createElement("option");
+  anyPlaylistOption.value = "all";
+  anyPlaylistOption.textContent = "Any playlist";
+  playlistFilterSelect.append(anyPlaylistOption);
+
+  for (const playlistTitle of playlistTitles) {
+    const option = document.createElement("option");
+    option.value = playlistTitle;
+    option.textContent = playlistTitle;
+    playlistFilterSelect.append(option);
+  }
+
+  if (state.playlistFilter !== "all" && !playlistTitles.includes(state.playlistFilter)) {
+    state.playlistFilter = "all";
+  }
+
+  playlistFilterSelect.value = state.playlistFilter;
 }
 
 function ensureSelectedItem(filteredItems: CatalogItem[]): CatalogItem | undefined {
@@ -184,6 +264,21 @@ function renderSummary(): void {
   totalItemsValue.textContent = String(state.catalog.items.length);
   totalImportsValue.textContent = String(state.catalog.imports.length);
   updatedAtValue.textContent = state.catalog.imports.length > 0 ? formatDateTime(state.catalog.updatedAt) : "Not yet imported";
+}
+
+function renderEnrichAllButton(): void {
+  if (state.enrichProgress) {
+    const { completed, failed, total } = state.enrichProgress;
+    const done = completed + failed;
+    enrichAllButton.textContent = `Enriching… ${done}/${total}`;
+    enrichAllButton.disabled = true;
+  } else {
+    const unenrichedCount = state.catalog.items.filter((item) => !item.enrichedMetadata).length;
+    enrichAllButton.textContent = unenrichedCount > 0
+      ? `Fetch metadata (${unenrichedCount})`
+      : "Re-fetch metadata";
+    enrichAllButton.disabled = state.isBusy || Boolean(state.fatalError);
+  }
 }
 
 function renderItemList(filteredItems: CatalogItem[]): void {
@@ -305,7 +400,26 @@ function renderDetailPanel(selectedItem: CatalogItem | undefined): void {
   youtubeLink.target = "_blank";
   youtubeLink.textContent = "Open on YouTube";
 
-  actions.append(youtubeLink);
+  const isEnrichingThis = state.enrichingVideoId === selectedItem.videoId;
+  const enrichButton = document.createElement("button");
+  enrichButton.type = "button";
+  enrichButton.className = "button button--secondary";
+  enrichButton.disabled = isEnrichingThis || Boolean(state.enrichProgress) || state.isBusy;
+  enrichButton.textContent = isEnrichingThis
+    ? "Fetching…"
+    : selectedItem.enrichedMetadata
+      ? "Re-fetch metadata"
+      : "Fetch metadata";
+  enrichButton.addEventListener("click", () => {
+    void handleEnrichSingle(selectedItem).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "Enrichment failed.";
+      appendMessages([{ kind: "error", text: message }]);
+      state.enrichingVideoId = undefined;
+      render();
+    });
+  });
+
+  actions.append(youtubeLink, enrichButton);
   heading.append(title, channel, actions);
   header.append(heading);
 
@@ -319,6 +433,62 @@ function renderDetailPanel(selectedItem: CatalogItem | undefined): void {
     createDetailField("Snapshots", String(selectedItem.importCount)),
     createDetailField("Source playlists", selectedItem.sourcePlaylistTitles.join(", "))
   );
+
+  if (selectedItem.enrichedMetadata) {
+    const em = selectedItem.enrichedMetadata;
+    const enrichedSection = document.createElement("section");
+    enrichedSection.className = "detail-enriched";
+
+    const enrichedTitle = document.createElement("h3");
+    enrichedTitle.textContent = "Enriched metadata";
+
+    const enrichedFields = document.createElement("dl");
+    enrichedFields.className = "detail-fields";
+
+    if (em.publishedAt) {
+      enrichedFields.append(createDetailField("Published", em.publishedAt));
+    }
+
+    if (em.viewCount !== undefined) {
+      enrichedFields.append(createDetailField("Views", em.viewCount.toLocaleString()));
+    }
+
+    if (em.availabilityStatus) {
+      enrichedFields.append(createDetailField("Availability", em.availabilityStatus));
+    }
+
+    if (em.privacyStatus) {
+      enrichedFields.append(createDetailField("Privacy", em.privacyStatus));
+    }
+
+    if (em.tags && em.tags.length > 0) {
+      enrichedFields.append(createDetailField("Tags", em.tags.slice(0, 10).join(", ")));
+    }
+
+    enrichedFields.append(createDetailField("Fetched", formatDateTime(em.enrichedAt)));
+
+    if (em.description) {
+      const descWrapper = document.createElement("div");
+      descWrapper.className = "detail-field detail-field--full";
+
+      const descLabel = document.createElement("dt");
+      descLabel.textContent = "Description";
+
+      const descValue = document.createElement("dd");
+      descValue.className = "detail-description";
+      descValue.textContent = em.description.length > 500
+        ? em.description.slice(0, 500) + "…"
+        : em.description;
+
+      descWrapper.append(descLabel, descValue);
+      enrichedFields.append(descWrapper);
+    }
+
+    enrichedSection.append(enrichedTitle, enrichedFields);
+    detailPanel.append(header, metadata, enrichedSection);
+  } else {
+    detailPanel.append(header, metadata);
+  }
 
   const historySection = document.createElement("section");
   historySection.className = "detail-history";
@@ -349,13 +519,15 @@ function renderDetailPanel(selectedItem: CatalogItem | undefined): void {
   }
 
   historySection.append(historyTitle, historyList);
-  detailPanel.append(header, metadata, historySection);
+  detailPanel.append(historySection);
 }
 
 function render(): void {
   renderSummary();
   renderMessages();
   setBusy(state.isBusy);
+  renderEnrichAllButton();
+  renderPlaylistFilterOptions();
 
   const filteredItems = getFilteredItems();
   const selectedItem = ensureSelectedItem(filteredItems);
@@ -454,6 +626,216 @@ async function handleImport(files: FileList): Promise<void> {
   render();
 }
 
+type WritableStreamLike = {
+  write(data: string): Promise<void>;
+  close(): Promise<void>;
+};
+
+type SaveFileHandleLike = {
+  createWritable(): Promise<WritableStreamLike>;
+};
+
+type WindowWithSaveFilePicker = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName: string;
+    types: Array<{
+      description: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<SaveFileHandleLike>;
+};
+
+function createExportFileName(): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `watch-later-catalog-${timestamp}.json`;
+}
+
+async function trySaveWithFilePicker(fileName: string, contents: string): Promise<boolean> {
+  const windowWithSavePicker = window as WindowWithSaveFilePicker;
+  if (!windowWithSavePicker.showSaveFilePicker) {
+    return false;
+  }
+
+  try {
+    const fileHandle = await windowWithSavePicker.showSaveFilePicker({
+      suggestedName: fileName,
+      types: [{
+        description: "JSON",
+        accept: {
+          "application/json": [".json"]
+        }
+      }]
+    });
+    const writable = await fileHandle.createWritable();
+    await writable.write(contents);
+    await writable.close();
+    return true;
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+async function tryCopyExportToClipboard(contents: string): Promise<boolean> {
+  if (!navigator.clipboard?.writeText) {
+    return false;
+  }
+
+  await navigator.clipboard.writeText(contents);
+  return true;
+}
+
+async function handleExportSnapshots(): Promise<void> {
+  if (state.catalog.items.length === 0) {
+    appendMessages([{ kind: "info", text: "No catalog data available to export yet." }]);
+    render();
+    return;
+  }
+
+  setBusy(true);
+
+  try {
+    const fileName = createExportFileName();
+    const contents = JSON.stringify(state.catalog, null, 2);
+    const savedToFile = await trySaveWithFilePicker(fileName, contents);
+
+    if (savedToFile) {
+      appendMessages([{ kind: "success", text: `${fileName}: export saved.` }]);
+      render();
+      return;
+    }
+
+    const copiedToClipboard = await tryCopyExportToClipboard(contents);
+    if (copiedToClipboard) {
+      appendMessages([{
+        kind: "info",
+        text: `${fileName}: copied export JSON to clipboard. Paste into a local .json file to back it up.`
+      }]);
+      render();
+      return;
+    }
+
+    appendMessages([{
+      kind: "error",
+      text: "Unable to export automatically in this browser. Clipboard access is unavailable."
+    }]);
+    render();
+  } finally {
+    setBusy(false);
+    render();
+  }
+}
+
+let enrichQueue: string[] = [];
+
+async function saveEnrichedMetadata(metadata: EnrichedVideoMetadata): Promise<void> {
+  state.catalog = applyEnrichedMetadata(state.catalog, metadata.videoId, metadata);
+  await saveCatalogStore(state.catalog);
+}
+
+async function handleEnrichSingle(item: CatalogItem): Promise<void> {
+  state.enrichingVideoId = item.videoId;
+  render();
+
+  const result = await fetchVideoEnrichment(item.videoId);
+
+  if (result.ok) {
+    await saveEnrichedMetadata(result.metadata);
+    appendMessages([{
+      kind: "success",
+      text: `${item.video.title}: metadata fetched.`
+    }]);
+  } else {
+    appendMessages([{
+      kind: "error",
+      text: `${item.video.title}: ${result.message}`
+    }]);
+  }
+
+  state.enrichingVideoId = undefined;
+  render();
+}
+
+function cancelEnrichAll(): void {
+  enrichQueue = [];
+  const { completed, failed } = state.enrichProgress ?? { completed: 0, failed: 0 };
+  state.enrichProgress = null;
+  appendMessages([{
+    kind: "info",
+    text: `Enrichment cancelled. Fetched ${completed} items, ${failed} failed.`
+  }]);
+  render();
+}
+
+function scheduleNextEnrich(): void {
+  setTimeout(() => {
+    void processEnrichQueue();
+  }, 1000);
+}
+
+async function processEnrichQueue(): Promise<void> {
+  if (enrichQueue.length === 0) {
+    const { completed, failed } = state.enrichProgress ?? { completed: 0, failed: 0 };
+    state.enrichProgress = null;
+    appendMessages([{
+      kind: "success",
+      text: `Enrichment complete: ${completed} fetched, ${failed} failed.`
+    }]);
+    render();
+    return;
+  }
+
+  const videoId = enrichQueue.shift()!;
+  const item = state.catalog.items.find((i) => i.videoId === videoId);
+  if (!item) {
+    scheduleNextEnrich();
+    return;
+  }
+
+  const result = await fetchVideoEnrichment(videoId);
+
+  if (result.ok) {
+    await saveEnrichedMetadata(result.metadata);
+    state.enrichProgress = {
+      ...(state.enrichProgress ?? { total: 0, completed: 0, failed: 0 }),
+      completed: (state.enrichProgress?.completed ?? 0) + 1
+    };
+  } else {
+    state.enrichProgress = {
+      ...(state.enrichProgress ?? { total: 0, completed: 0, failed: 0 }),
+      failed: (state.enrichProgress?.failed ?? 0) + 1
+    };
+  }
+
+  render();
+  scheduleNextEnrich();
+}
+
+async function handleEnrichAll(): Promise<void> {
+  if (state.catalog.items.length === 0) {
+    appendMessages([{ kind: "info", text: "No catalog items to enrich." }]);
+    render();
+    return;
+  }
+
+  const unenriched = state.catalog.items.filter((item) => !item.enrichedMetadata);
+  const toEnrich = unenriched.length > 0 ? unenriched : state.catalog.items;
+
+  enrichQueue = toEnrich.map((item) => item.videoId);
+  state.enrichProgress = { total: enrichQueue.length, completed: 0, failed: 0 };
+
+  appendMessages([{
+    kind: "info",
+    text: `Starting metadata enrichment for ${enrichQueue.length} videos (about ${Math.ceil(enrichQueue.length / 60)} min).`
+  }]);
+
+  render();
+  void processEnrichQueue();
+}
+
 fileInput.addEventListener("change", () => {
   const files = fileInput.files;
   if (!files) {
@@ -475,6 +857,29 @@ reloadButton.addEventListener("click", () => {
   });
 });
 
+exportSnapshotsButton.addEventListener("click", () => {
+  void handleExportSnapshots().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : "Export failed.";
+    appendMessages([{ kind: "error", text: message }]);
+    setBusy(false);
+    render();
+  });
+});
+
+enrichAllButton.addEventListener("click", () => {
+  if (state.enrichProgress) {
+    cancelEnrichAll();
+    return;
+  }
+
+  void handleEnrichAll().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : "Enrichment failed.";
+    appendMessages([{ kind: "error", text: message }]);
+    state.enrichProgress = null;
+    render();
+  });
+});
+
 searchInput.addEventListener("input", () => {
   state.searchQuery = searchInput.value;
   render();
@@ -487,6 +892,16 @@ durationFilterSelect.addEventListener("change", () => {
 
 recencyFilterSelect.addEventListener("change", () => {
   state.recencyFilter = recencyFilterSelect.value as RecencyFilter;
+  render();
+});
+
+playlistFilterSelect.addEventListener("change", () => {
+  state.playlistFilter = playlistFilterSelect.value;
+  render();
+});
+
+sortOrderSelect.addEventListener("change", () => {
+  state.sortOrder = sortOrderSelect.value as SortOrder;
   render();
 });
 

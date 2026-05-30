@@ -59,11 +59,12 @@ function buildPageScanFailure(message: string): PageScanResponse {
 
 function sendPageScanRequest(tabId: number): Promise<PageScanResponse> {
   return browser.tabs.sendMessage<PageScanResponse>(tabId, {
-   type: "watch-later/scan-page"
+   type: "watch-later/scan-page",
+   loadAll: true
   })
    .then((response) => {
      if (!response) {
-       return buildPageScanFailure("The Watch Later page did not return any scan data. Reload the tab, then try exporting again.");
+       return buildPageScanFailure("The Watch Later page did not return any scan data. Reload the tab, then try saving again.");
      }
 
      return response;
@@ -73,7 +74,7 @@ function sendPageScanRequest(tabId: number): Promise<PageScanResponse> {
        ? ` ${error.message}`
        : "";
 
-     return buildPageScanFailure(`The Watch Later page script is unavailable. Reload the tab, then try exporting again.${detail}`);
+     return buildPageScanFailure(`The Watch Later page script is unavailable. Reload the tab, then try saving again.${detail}`);
    });
 }
 
@@ -81,7 +82,7 @@ async function scanActiveWatchLaterPage(): Promise<PageScanResponse> {
   const tab = await getActiveTab();
 
   if (!tab?.id || !isWatchLaterUrl(tab.url)) {
-   return buildPageScanFailure("Open your YouTube Watch Later playlist, then try exporting again.");
+   return buildPageScanFailure("Open your YouTube Watch Later playlist, then try saving again.");
   }
 
   return sendPageScanRequest(tab.id);

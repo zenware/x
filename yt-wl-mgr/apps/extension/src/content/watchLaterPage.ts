@@ -3,6 +3,9 @@ type WatchLaterPageScan = import("../messages.js").WatchLaterPageScan;
 import type { WatchLaterVideo } from "../../../../packages/core/src/index.js";
 
 const itemSelector = "ytd-playlist-video-renderer";
+const loadAllDelayMs = 750;
+const loadAllStablePasses = 3;
+const loadAllMaxPasses = 90;
 
 function toAbsoluteYoutubeUrl(pathname: string, origin: string): string {
   return new URL(pathname, origin).toString();
@@ -46,6 +49,52 @@ export function createWatchLaterPageScan(
     playlistTitle,
     items
   };
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
+
+function countVisibleVideos(document: Document): number {
+  return document.querySelectorAll(itemSelector).length;
+}
+
+function scrollPlaylistToBottom(document: Document): void {
+  const scrollRoot = document.scrollingElement;
+  const targetTop = scrollRoot ? scrollRoot.scrollHeight : document.body.scrollHeight;
+  if (scrollRoot) {
+    scrollRoot.scrollTop = targetTop;
+  }
+
+  window.scrollTo({
+    top: targetTop,
+    left: 0,
+    behavior: "auto"
+  });
+}
+
+export async function ensureWatchLaterItemsLoaded(document: Document): Promise<void> {
+  let previousCount = -1;
+  let stablePasses = 0;
+
+  for (let pass = 0; pass < loadAllMaxPasses; pass += 1) {
+    const currentCount = countVisibleVideos(document);
+    if (currentCount === previousCount) {
+      stablePasses += 1;
+    } else {
+      stablePasses = 0;
+      previousCount = currentCount;
+    }
+
+    if (stablePasses >= loadAllStablePasses) {
+      break;
+    }
+
+    scrollPlaylistToBottom(document);
+    await delay(loadAllDelayMs);
+  }
 }
 
 export function extractWatchLaterVideosFromDocument(document: Document, pageUrl: URL): WatchLaterVideo[] {
@@ -96,15 +145,23 @@ export function snapshotWatchLaterPage(
   );
 }
 
-export function buildWatchLaterPageScanResponse(document: Document, locationHref: string): PageScanResponse {
+export async function buildWatchLaterPageScanResponse(
+  document: Document,
+  locationHref: string,
+  loadAll = false
+): Promise<PageScanResponse> {
   const pageUrl = new URL(locationHref);
 
   if (!isWatchLaterPage(pageUrl)) {
     return {
       type: "watch-later/scan-result",
       ok: false,
-      message: "Open your YouTube Watch Later playlist, then try exporting again."
+      message: "Open your YouTube Watch Later playlist, then try saving again."
     };
+  }
+
+  if (loadAll) {
+    await ensureWatchLaterItemsLoaded(document);
   }
 
   const scan = snapshotWatchLaterPage(document, locationHref);

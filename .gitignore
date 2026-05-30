@@ -1,0 +1,7 @@
+.devenv/
+.direnv/
+node_modules/
+dist/
+*.tsbuildinfo
+yt-wl-mgr/apps/*/dist/
+yt-wl-mgr/packages/*/dist/
