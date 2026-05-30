@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Watch Later Catalog</title>
+    <link rel="stylesheet" href="./catalog.css">
+  </head>
+  <body>
+    <main class="catalog-page">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">WLM-002 · WLM-003 · WLM-004</p>
+          <h1>Watch Later catalog</h1>
+          <p class="page-header__lede">Import exported snapshots, keep them in extension storage, and browse your backlog locally.</p>
+        </div>
+
+        <div class="page-header__actions">
+          <label class="button button--primary button--file" data-role="import-button">
+            Import snapshots
+            <input class="visually-hidden" data-role="file-input" type="file" accept=".json,application/json" multiple>
+          </label>
+          <button class="button button--secondary" type="button" data-role="reload-button">Reload</button>
+        </div>
+      </header>
+
+      <section class="stats-grid" aria-label="Catalog summary">
+        <article class="stat-card">
+          <p class="stat-card__label">Catalog items</p>
+          <p class="stat-card__value" data-role="total-items">0</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-card__label">Imported snapshots</p>
+          <p class="stat-card__value" data-role="total-imports">0</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-card__label">Last updated</p>
+          <p class="stat-card__value stat-card__value--small" data-role="updated-at">Not yet imported</p>
+        </article>
+      </section>
+
+      <section class="status-panel" data-role="status-panel" hidden></section>
+
+      <section class="controls" aria-label="Catalog filters">
+        <label class="field field--search">
+          <span>Search title or channel</span>
+          <input data-role="search-input" type="search" placeholder="Search your catalog">
+        </label>
+
+        <label class="field">
+          <span>Duration</span>
+          <select data-role="duration-filter">
+            <option value="all">Any duration</option>
+            <option value="short">Short (&lt; 10 min)</option>
+            <option value="medium">Medium (10–30 min)</option>
+            <option value="long">Long (&gt; 30 min)</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Imported</span>
+          <select data-role="recency-filter">
+            <option value="all">Any time</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="older">Older than 30 days</option>
+          </select>
+        </label>
+
+        <button class="button button--ghost" type="button" data-role="clear-filters">Clear filters</button>
+      </section>
+
+      <section class="content-grid">
+        <section class="list-panel">
+          <div class="list-panel__header">
+            <div>
+              <h2>Catalog</h2>
+              <p data-role="list-summary">Import one or more exported snapshots to build your catalog.</p>
+            </div>
+          </div>
+
+          <div class="empty-state" data-role="empty-state">
+            <h3>No snapshots imported yet</h3>
+            <p>Use the import button above to add one or more JSON exports from the popup workflow.</p>
+          </div>
+
+          <div class="empty-state" data-role="no-results-state" hidden>
+            <h3>No matches</h3>
+            <p>Try a different search term, or clear the duration and recency filters.</p>
+          </div>
+
+          <ul class="item-list" data-role="item-list"></ul>
+        </section>
+
+        <aside class="detail-panel" data-role="detail-panel"></aside>
+      </section>
+    </main>
+
+    <script src="./dist/apps/extension/src/catalog.js"></script>
+  </body>
+</html>

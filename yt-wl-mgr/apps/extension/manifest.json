@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Watch Later Manager",
+  "version": "0.1.0",
+  "description": "Local-first tooling for snapshotting and organizing a large YouTube Watch Later backlog.",
+  "permissions": [
+    "downloads",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "dist/apps/extension/src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/playlist*"
+      ],
+      "js": [
+        "dist/apps/extension/src/content/watchLaterSnapshot.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "YT Watch Later Manager",
+    "default_popup": "popup.html"
+  },
+  "options_page": "catalog.html"
+}

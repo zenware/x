@@ -1,0 +1,210 @@
+[
+  {
+    "id": "WLM-001",
+    "title": "Export a Watch Later snapshot to a local JSON file",
+    "type": "feature",
+    "priority": "P0",
+    "status": "done",
+    "summary": "Make the extension usable on day one: load it on youtube.com, detect the Watch Later playlist page, capture visible items, normalize them, and save a deduplicated snapshot file locally.",
+    "userJourney": "As a user with a large Watch Later backlog, I can export my current queue into a portable JSON snapshot without needing any server or OAuth setup.",
+    "deliverables": [
+      "Manifest V3 extension shell wired to the Watch Later page",
+      "content-script DOM scan for title, channel, duration, URL, thumbnail, and date added when available",
+      "shared normalized snapshot shape in packages/core",
+      "download or copy flow that produces a deduplicated JSON snapshot"
+    ],
+    "testableOutcome": "Run `npm install` and `npm run build`, add `apps/extension` to Safari with `Add Temporary Extension\u2026`, open https://www.youtube.com/playlist?list=WL, trigger export from the popup, and confirm the downloaded JSON contains normalized entries for the videos currently loaded on the page."
+  },
+  {
+    "id": "WLM-002",
+    "title": "Import one snapshot into a persistent local catalog",
+    "type": "feature",
+    "priority": "P0",
+    "status": "done",
+    "summary": "Turn a snapshot into a usable local product slice by letting the user import the file, persist it in extension-managed storage, and reopen the catalog later.",
+    "userJourney": "As a user, I can import a snapshot once and come back later without rescanning YouTube just to see my backlog.",
+    "deliverables": [
+      "snapshot import UI in an extension page",
+      "browser-local storage for imported snapshots and derived catalog entries",
+      "import validation and deduplication against existing catalog items",
+      "catalog landing page that reloads persisted data on open"
+    ],
+    "dependsOn": [
+      "WLM-001"
+    ],
+    "testableOutcome": "Open the catalog/options page, import a snapshot, close the page, reopen it, and confirm the same catalog entries still exist in extension-local storage without re-importing."
+  },
+  {
+    "id": "WLM-003",
+    "title": "Search and filter the imported backlog end-to-end",
+    "type": "feature",
+    "priority": "P0",
+    "status": "done",
+    "summary": "Make the first catalog slice useful by supporting search and a small set of practical filters directly against persisted imported data.",
+    "userJourney": "As a user, I can narrow a large imported backlog by title, channel, duration, and import recency so I can actually find something to act on.",
+    "deliverables": [
+      "search by title and channel",
+      "filters for duration bucket and import recency",
+      "catalog state that updates from local persisted data only",
+      "empty and no-results states that make the catalog understandable"
+    ],
+    "dependsOn": [
+      "WLM-002"
+    ],
+    "testableOutcome": "Import a snapshot into the catalog, search for a known title or channel, apply duration and import-recency filters, and confirm the visible list updates correctly from persisted local data only."
+  },
+  {
+    "id": "WLM-004",
+    "title": "Open a video detail view that combines imported fields cleanly",
+    "type": "feature",
+    "priority": "P0",
+    "status": "done",
+    "summary": "Add a focused detail view so an item in the local catalog becomes inspectable and actionable instead of staying a flat row in a list.",
+    "userJourney": "As a user, I can open one backlog item and review the imported metadata, thumbnail, and YouTube link before deciding what to do next.",
+    "deliverables": [
+      "detail panel or route launched from the catalog",
+      "display of imported snapshot fields from the shared domain model",
+      "deep link back to the YouTube watch page",
+      "clear handling for missing optional fields such as thumbnail or duration"
+    ],
+    "dependsOn": [
+      "WLM-003"
+    ],
+    "testableOutcome": "From the catalog, select a video and confirm the detail view shows the imported metadata, import history, and a link back to the YouTube watch page."
+  },
+  {
+    "id": "WLM-005",
+    "title": "Enrich selected catalog items with YouTube metadata",
+    "type": "feature",
+    "priority": "P0",
+    "status": "todo",
+    "summary": "Introduce OAuth and YouTube Data API access only when it powers a complete user workflow: choose items, fetch richer metadata, cache it locally, and show it in the detail view.",
+    "userJourney": "As a user, I can authorize once, enrich selected videos, and immediately see the extra context that helps me decide whether to keep or move them.",
+    "deliverables": [
+      "OAuth setup for YouTube Data API access",
+      "batch enrichment for selected imported videos",
+      "cached metadata refresh behavior in local storage",
+      "detail view that merges imported data with enriched metadata such as published date, description, tags, stats, and availability"
+    ],
+    "dependsOn": [
+      "WLM-004"
+    ],
+    "testableOutcome": "Authorize the extension, enrich at least one catalog item, reopen its detail view, and confirm the enriched fields persist locally."
+  },
+  {
+    "id": "WLM-006",
+    "title": "Assign a topic with auto-suggestions and manual override",
+    "type": "feature",
+    "priority": "P0",
+    "status": "todo",
+    "summary": "Deliver the first organization slice by suggesting a topic and format for each video, while making the user-confirmed label the source of truth.",
+    "userJourney": "As a user, I can take a suggested label, accept it or correct it, and trust that my explicit topic choice is what downstream features use.",
+    "deliverables": [
+      "rules-based topic and format suggestions",
+      "manual relabeling flow from the catalog or detail view",
+      "saved topic buckets such as WL - AI or WL - Comedy",
+      "separate storage for suggested versus confirmed labels"
+    ],
+    "dependsOn": [
+      "WLM-005"
+    ],
+    "testableOutcome": "Generate a suggestion for a video, override it manually, reload the catalog, and confirm the confirmed topic persists and wins over the suggestion."
+  },
+  {
+    "id": "WLM-007",
+    "title": "Build a watch-next queue for a chosen time budget",
+    "type": "feature",
+    "priority": "P1",
+    "status": "todo",
+    "summary": "Use imported and enriched data plus confirmed labels to generate a practical queue for a real viewing session instead of just a categorized catalog.",
+    "userJourney": "As a user, I can pick 15, 30, 60, or 120 minutes and get a ranked queue with enough explanation to trust the recommendations.",
+    "deliverables": [
+      "rules-based priority scoring",
+      "duration-aware queue generation",
+      "freshness boosts for time-sensitive content",
+      "manual boost and deprioritize controls reflected in the queue"
+    ],
+    "dependsOn": [
+      "WLM-006"
+    ],
+    "testableOutcome": "Choose a time budget, generate a queue, adjust a video's priority, and confirm the resulting queue updates in a way that matches the rule set."
+  },
+  {
+    "id": "WLM-008",
+    "title": "Review a dry-run playlist sync plan before writing to YouTube",
+    "type": "feature",
+    "priority": "P1",
+    "status": "todo",
+    "summary": "Convert confirmed topics into concrete playlist actions that can be inspected and approved before any mutation occurs on the user's YouTube account.",
+    "userJourney": "As a user, I can preview what videos would move to which playlists and approve only the changes I trust.",
+    "deliverables": [
+      "suggested target playlist names from confirmed topics",
+      "bulk review workflow with approve and unapprove controls",
+      "dry-run action preview showing intended creates and inserts",
+      "audit trail of proposed versus approved moves"
+    ],
+    "dependsOn": [
+      "WLM-006"
+    ],
+    "testableOutcome": "Generate a sync plan from labeled videos, review the dry-run output, approve a subset, and confirm only the approved actions remain selected for execution."
+  },
+  {
+    "id": "WLM-009",
+    "title": "Sync approved videos into user-created topic playlists",
+    "type": "feature",
+    "priority": "P1",
+    "status": "todo",
+    "summary": "Finish the first full reorganization loop by creating or reusing user playlists, inserting approved videos safely, and recording what happened.",
+    "userJourney": "As a user, I can take reviewed playlist changes and apply them to YouTube without duplicating items or losing track of failures.",
+    "deliverables": [
+      "playlist creation and lookup",
+      "duplicate-safe inserts",
+      "sync execution log with per-item results",
+      "explicit failure handling for quota, permissions, and unavailable videos"
+    ],
+    "dependsOn": [
+      "WLM-008"
+    ],
+    "testableOutcome": "Approve a playlist sync plan, run sync, and confirm that YouTube playlists reflect the approved actions while the extension records successes and failures."
+  },
+  {
+    "id": "WLM-010",
+    "title": "Resume interrupted scans and make degraded catalog states visible",
+    "type": "feature",
+    "priority": "P1",
+    "status": "todo",
+    "summary": "Harden the main workflows for a 3,700+ video backlog by making long-running work resumable and degraded video states visible throughout the product.",
+    "userJourney": "As a user, I can recover from interruptions and still understand which videos are unavailable, deleted, or partially processed.",
+    "deliverables": [
+      "resumable snapshot import and enrichment jobs",
+      "progress reporting for long scans and enrichments",
+      "catalog states for deleted, private, and unavailable videos",
+      "partial failure recovery that preserves completed work"
+    ],
+    "dependsOn": [
+      "WLM-002",
+      "WLM-005",
+      "WLM-009"
+    ],
+    "testableOutcome": "Interrupt an import, enrichment, or sync flow, resume it, and confirm completed work is preserved while degraded video states remain visible in the catalog."
+  },
+  {
+    "id": "WLM-011",
+    "title": "Decide when extension-only stops being the right architecture",
+    "type": "task",
+    "priority": "P2",
+    "status": "todo",
+    "summary": "After the core local-first slices exist, evaluate whether storage, UX, or performance pressure justify a local companion app with SQLite and Drizzle.",
+    "userJourney": "As the maintainer, I can make an explicit architecture decision based on real product pressure instead of prematurely introducing a second runtime.",
+    "deliverables": [
+      "decision criteria tied to measured storage and UX constraints",
+      "thresholds for when extension pages become too limiting",
+      "migration sketch for a local companion app if the threshold is crossed",
+      "clear recommendation to stay extension-only or introduce a companion runtime"
+    ],
+    "dependsOn": [
+      "WLM-010"
+    ],
+    "testableOutcome": "Review the documented criteria against observed product behavior and record a decision with enough detail to guide the next implementation phase."
+  }
+]
