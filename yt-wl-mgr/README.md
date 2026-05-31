@@ -76,9 +76,13 @@ Exports reflect the videos currently loaded on the Watch Later page DOM, not you
 1. From the popup, click `Open catalog` to open the extension's catalog/options page.
 2. Click `Import snapshots` and choose one or more exported JSON files.
 3. Browse the saved catalog locally with:
-   - search by title or channel
+   - search by title, channel, tags, or enriched description text
+   - tag filters
+   - deterministic category suggestions (`educational`, `practical`, `news & analysis`, `podcast / talk`, `music / performance`, `entertainment`)
+   - deterministic priority suggestions (`do`, `decide`, `delete`) distilled from title, tags, description, and runtime
    - duration filters
    - import recency filters
 4. Select an item to view saved details, import history, and the link back to YouTube.
+5. Remove watched items from the local catalog without changing the actual YouTube Watch Later list.
 
 Imported snapshots are persisted in the extension's local storage, so the catalog stays available when you reopen it later.

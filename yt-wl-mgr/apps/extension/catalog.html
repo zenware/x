@@ -45,7 +45,7 @@
 
       <section class="controls" aria-label="Catalog filters">
         <label class="field field--search">
-          <span>Search title or channel</span>
+          <span>Search title, channel, tags, or description</span>
           <input data-role="search-input" type="search" placeholder="Search your catalog">
         </label>
 
@@ -78,6 +78,37 @@
         </label>
 
         <label class="field">
+          <span>Tag</span>
+          <select data-role="tag-filter">
+            <option value="all">Any tag</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Category</span>
+          <select data-role="category-filter">
+            <option value="all">Any category</option>
+            <option value="educational">Educational</option>
+            <option value="practical">Practical / how-to</option>
+            <option value="news-analysis">News &amp; analysis</option>
+            <option value="podcast-talk">Podcast / talk</option>
+            <option value="music-performance">Music / performance</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="uncategorized">Uncategorized</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Priority</span>
+          <select data-role="priority-filter">
+            <option value="all">Any priority</option>
+            <option value="do">Do</option>
+            <option value="decide">Decide</option>
+            <option value="delete">Delete</option>
+          </select>
+        </label>
+
+        <label class="field">
           <span>Sort</span>
           <select data-role="sort-order">
             <option value="recent">Recently imported</option>
@@ -85,6 +116,7 @@
             <option value="title">Title (A–Z)</option>
             <option value="channel">Channel (A–Z)</option>
             <option value="import-count">Most snapshots</option>
+            <option value="priority">Suggested priority</option>
           </select>
         </label>
 
@@ -97,6 +129,7 @@
             <div>
               <h2>Catalog</h2>
               <p data-role="list-summary">Import one or more exported snapshots to build your catalog.</p>
+              <div class="active-filters" data-role="active-filters" hidden></div>
             </div>
           </div>
 

@@ -7,14 +7,14 @@
 - `apps/extension/src/background.ts` installs the MV3 service worker and serves popup export requests.
 - `apps/extension/src/content/watchLaterSnapshot.ts` scans the Watch Later playlist DOM and produces a normalized snapshot.
 - `apps/extension/src/catalog.ts` powers the extension-managed catalog page for importing, searching, filtering, and inspecting saved items.
-- `packages/core/src/index.ts` holds the shared domain types and catalog helpers used by export and import flows.
+- `packages/core/src/index.ts` holds the shared domain types, advanced search helpers, and deterministic category/priority heuristics used by export and import flows.
 
 ## Current workspace architecture
 
 | Area | Role | Current state |
 | --- | --- | --- |
 | `apps/extension` | Cross-browser WebExtensions runtime | Manifest, background worker, popup export flow, and local catalog page exist |
-| `packages/core` | Shared domain model | Exposes snapshot, catalog, enrichment, and playlist suggestion types |
+| `packages/core` | Shared domain model | Exposes snapshot, catalog, enrichment, search, and deterministic suggestion types |
 | Browser storage | Local persistence | Stores imported snapshots and derived catalog entries in extension-local storage |
 | Extension UI pages | Import/catalog/review UI | Import, search/filter, and detail UI implemented; review flows still planned |
 | YouTube Data API | Enrichment and playlist sync | Planned, not yet implemented |
@@ -58,7 +58,7 @@ graph LR
 
 ## Current ingestion flow
 
-Today the popup requests a normalized snapshot from the active Watch Later tab and saves it as a JSON export. The catalog page then imports one or more exports into extension-local storage and deduplicates them into a searchable catalog.
+Today the popup requests a normalized snapshot from the active Watch Later tab and saves it as a JSON export. The catalog page then imports one or more exports into extension-local storage, deduplicates them into a searchable catalog, and derives lightweight category / priority suggestions from the local metadata without using an LLM.
 
 ```mermaid
 sequenceDiagram
@@ -112,14 +112,14 @@ flowchart TD
 
 ### 2. Shared domain model
 
-- **Role:** define portable shapes for snapshot items, catalog records, enriched metadata, and playlist sync suggestions.
+- **Role:** define portable shapes for snapshot items, catalog records, enriched metadata, deterministic watch suggestions, and playlist sync suggestions.
 - **Why:** the same objects should flow through export, import, catalog, and sync surfaces.
 - **Code anchor:** `packages/core/src/index.ts`.
 
 ### 3. Local catalog
 
 - **Current runtime:** browser-managed extension storage plus extension pages.
-- **Responsibility:** persist imports, deduplicate entries, and surface search/filter/detail workflows.
+- **Responsibility:** persist imports, deduplicate entries, derive local-first category / priority signals, and surface search/filter/detail workflows.
 - **Constraint:** keep it ergonomic for a large backlog before introducing a separate local app.
 
 ### 4. API-backed enrichment and sync
