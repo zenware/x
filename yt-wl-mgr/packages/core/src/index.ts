@@ -74,6 +74,27 @@ export type CatalogDurationBucket = "short" | "medium" | "long" | "unknown";
 
 export type CatalogImportRecency = "all" | "7d" | "30d" | "older";
 
+export type CatalogSuggestedCategory =
+  | "educational"
+  | "practical"
+  | "news-analysis"
+  | "podcast-talk"
+  | "music-performance"
+  | "entertainment"
+  | "uncategorized";
+
+export type CatalogSuggestedPriority = "do" | "decide" | "delete";
+
+export type CatalogWatchFit = "quick-hit" | "meal-friendly" | "deep-focus";
+
+export type CatalogItemInsights = {
+  category: CatalogSuggestedCategory;
+  priority: CatalogSuggestedPriority;
+  watchFit: CatalogWatchFit;
+  priorityScore: number;
+  reasons: string[];
+};
+
 export type EnrichedVideoMetadata = {
   videoId: string;
   enrichedAt: string;
@@ -111,6 +132,23 @@ function normalizeText(value: string | undefined, fallback?: string): string | u
 
 function normalizeUrl(value: string): string {
   return value.trim();
+}
+
+function normalizeForMatching(value: string | undefined): string {
+  return (value ?? "")
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function matchesNormalizedTerm(value: string, term: string): boolean {
+  const normalizedTerm = normalizeForMatching(term);
+  if (!normalizedTerm) {
+    return false;
+  }
+
+  return (` ${value} `).includes(` ${normalizedTerm} `);
 }
 
 function normalizeStringList(values: string[]): string[] {
@@ -608,5 +646,361 @@ export function applyEnrichedMetadata(
     ...catalog,
     items,
     updatedAt: new Date().toISOString()
+  };
+}
+
+export function removeCatalogItem(catalog: CatalogStore, videoId: string): CatalogStore {
+  const items = catalog.items.filter((item) => item.videoId !== videoId);
+  if (items.length === catalog.items.length) {
+    return catalog;
+  }
+
+  return {
+    ...catalog,
+    items,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export function getCatalogItemTags(item: CatalogItem): string[] {
+  return normalizeStringList(item.enrichedMetadata?.tags ?? []);
+}
+
+export function createCatalogItemSearchIndex(item: CatalogItem): string {
+  return [
+    item.video.title,
+    item.video.channelName,
+    item.enrichedMetadata?.description,
+    ...getCatalogItemTags(item)
+  ]
+    .map((segment) => normalizeForMatching(segment))
+    .filter((segment) => segment.length > 0)
+    .join(" ");
+}
+
+export function matchesCatalogItemQuery(item: CatalogItem, query: string): boolean {
+  const normalizedQuery = normalizeForMatching(query);
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  const searchIndex = createCatalogItemSearchIndex(item);
+
+  if (!searchIndex) {
+    return false;
+  }
+
+  const tokens = normalizedQuery.split(" ");
+  return tokens.every((token) => matchesNormalizedTerm(searchIndex, token));
+}
+
+type CatalogSignalFields = {
+  title: string;
+  channel: string;
+  description: string;
+  tags: string[];
+  durationSeconds: number | undefined;
+};
+
+type CategoryRule = {
+  category: Exclude<CatalogSuggestedCategory, "uncategorized">;
+  terms: string[];
+};
+
+const categoryRules: CategoryRule[] = [
+  {
+    category: "educational",
+    terms: [
+      "learn",
+      "lesson",
+      "lecture",
+      "course",
+      "class",
+      "explained",
+      "explainer",
+      "education",
+      "theory",
+      "history",
+      "science",
+      "math",
+      "physics",
+      "chemistry",
+      "programming"
+    ]
+  },
+  {
+    category: "practical",
+    terms: [
+      "how to",
+      "tutorial",
+      "guide",
+      "walkthrough",
+      "demo",
+      "build",
+      "setup",
+      "install",
+      "fix",
+      "recipe",
+      "tips",
+      "workflow",
+      "review"
+    ]
+  },
+  {
+    category: "news-analysis",
+    terms: [
+      "news",
+      "analysis",
+      "update",
+      "breakdown",
+      "report",
+      "recap",
+      "commentary",
+      "interview",
+      "debate",
+      "documentary"
+    ]
+  },
+  {
+    category: "podcast-talk",
+    terms: [
+      "podcast",
+      "conversation",
+      "discussion",
+      "talk",
+      "episode",
+      "livestream",
+      "stream",
+      "q a",
+      "qa",
+      "interview"
+    ]
+  },
+  {
+    category: "music-performance",
+    terms: [
+      "music",
+      "song",
+      "album",
+      "performance",
+      "concert",
+      "live",
+      "cover",
+      "remix",
+      "piano",
+      "guitar"
+    ]
+  },
+  {
+    category: "entertainment",
+    terms: [
+      "funny",
+      "comedy",
+      "reaction",
+      "meme",
+      "prank",
+      "vlog",
+      "trailer",
+      "highlights",
+      "clip",
+      "gameplay",
+      "challenge"
+    ]
+  }
+];
+
+const positivePriorityTerms = [
+  "learn",
+  "tutorial",
+  "how to",
+  "guide",
+  "lesson",
+  "course",
+  "lecture",
+  "explained",
+  "analysis",
+  "documentary",
+  "breakdown",
+  "deep dive"
+];
+
+const negativePriorityTerms = [
+  "reaction",
+  "clip",
+  "shorts",
+  "highlights",
+  "trailer",
+  "teaser",
+  "compilation",
+  "meme",
+  "prank"
+];
+
+function collectCatalogSignalFields(item: CatalogItem): CatalogSignalFields {
+  return {
+    title: normalizeForMatching(item.video.title),
+    channel: normalizeForMatching(item.video.channelName),
+    description: normalizeForMatching(item.enrichedMetadata?.description),
+    tags: getCatalogItemTags(item).map((tag) => normalizeForMatching(tag)),
+    durationSeconds: parseDurationTextToSeconds(item.video.durationText)
+  };
+}
+
+function scoreCategoryMatch(
+  fields: CatalogSignalFields,
+  rule: CategoryRule
+): { score: number; matches: string[] } {
+  let score = 0;
+  const matches = new Set<string>();
+
+  for (const term of rule.terms) {
+    if (matchesNormalizedTerm(fields.title, term)) {
+      score += 4;
+      matches.add(term);
+      continue;
+    }
+
+    if (fields.tags.some((tag) => matchesNormalizedTerm(tag, term))) {
+      score += 3;
+      matches.add(term);
+      continue;
+    }
+
+    if (matchesNormalizedTerm(fields.description, term)) {
+      score += 2;
+      matches.add(term);
+      continue;
+    }
+
+    if (matchesNormalizedTerm(fields.channel, term)) {
+      score += 1;
+      matches.add(term);
+    }
+  }
+
+  return { score, matches: Array.from(matches) };
+}
+
+function getWatchFit(
+  durationSeconds: number | undefined,
+  category: CatalogSuggestedCategory
+): CatalogWatchFit {
+  if (durationSeconds === undefined) {
+    return category === "educational" || category === "podcast-talk" ? "deep-focus" : "meal-friendly";
+  }
+
+  if (durationSeconds < 12 * 60) {
+    return "quick-hit";
+  }
+
+  if (durationSeconds <= 35 * 60) {
+    return "meal-friendly";
+  }
+
+  return "deep-focus";
+}
+
+function pushReason(reasons: string[], reason: string): void {
+  if (!reasons.includes(reason)) {
+    reasons.push(reason);
+  }
+}
+
+export function deriveCatalogItemInsights(item: CatalogItem): CatalogItemInsights {
+  const fields = collectCatalogSignalFields(item);
+  const categoryScores = categoryRules.map((rule) => ({
+    category: rule.category,
+    ...scoreCategoryMatch(fields, rule)
+  }));
+  categoryScores.sort((left, right) => right.score - left.score);
+
+  const topCategory = categoryScores[0];
+  const category = topCategory && topCategory.score >= 3 ? topCategory.category : "uncategorized";
+  const watchFit = getWatchFit(fields.durationSeconds, category);
+  const reasons: string[] = [];
+
+  if (topCategory && topCategory.score >= 3 && topCategory.matches.length > 0) {
+    pushReason(reasons, `Matched ${topCategory.matches.slice(0, 3).join(", ")}.`);
+  }
+
+  let priorityScore = 0;
+  const basePriorityScores: Record<CatalogSuggestedCategory, number> = {
+    educational: 4,
+    practical: 3,
+    "news-analysis": 1,
+    "podcast-talk": 1,
+    "music-performance": -1,
+    entertainment: -1,
+    uncategorized: 0
+  };
+  priorityScore += basePriorityScores[category];
+
+  if (category === "educational" || category === "practical") {
+    pushReason(reasons, "Leans toward learning value.");
+  }
+
+  if (watchFit === "meal-friendly") {
+    priorityScore += category === "educational" || category === "practical" ? 2 : 1;
+    pushReason(reasons, "Fits a typical meal-length watch.");
+  } else if (watchFit === "quick-hit") {
+    priorityScore += 1;
+    pushReason(reasons, "Short enough to clear quickly.");
+  } else if (category === "educational" || category === "practical" || category === "news-analysis") {
+    priorityScore += 1;
+    pushReason(reasons, "Looks like deeper material worth scheduling.");
+  } else {
+    priorityScore -= 1;
+    pushReason(reasons, "Longer runtime makes it easier to defer.");
+  }
+
+  if (
+    matchesNormalizedTerm(fields.title, "private")
+    || item.enrichedMetadata?.availabilityStatus === "deleted"
+    || item.enrichedMetadata?.availabilityStatus === "unavailable"
+    || item.enrichedMetadata?.privacyStatus === "private"
+  ) {
+    priorityScore -= 6;
+    pushReason(reasons, "Not currently watchable.");
+  }
+
+  if (
+    positivePriorityTerms.some((term) =>
+      matchesNormalizedTerm(fields.title, term)
+      || matchesNormalizedTerm(fields.description, term)
+      || fields.tags.some((tag) => matchesNormalizedTerm(tag, term))
+    )
+  ) {
+    priorityScore += 2;
+    pushReason(reasons, "Strong instructional or analysis cues.");
+  }
+
+  if (
+    negativePriorityTerms.some((term) =>
+      matchesNormalizedTerm(fields.title, term)
+      || matchesNormalizedTerm(fields.description, term)
+      || fields.tags.some((tag) => matchesNormalizedTerm(tag, term))
+    )
+  ) {
+    priorityScore -= 2;
+    pushReason(reasons, "Looks more disposable than evergreen.");
+  }
+
+  if (category === "uncategorized" && !item.enrichedMetadata?.description && getCatalogItemTags(item).length === 0) {
+    priorityScore -= 1;
+    pushReason(reasons, "Metadata is too thin to justify urgency yet.");
+  }
+
+  const priority: CatalogSuggestedPriority = priorityScore >= 4
+    ? "do"
+    : priorityScore <= -3
+      ? "delete"
+      : "decide";
+
+  return {
+    category,
+    priority,
+    watchFit,
+    priorityScore,
+    reasons: reasons.slice(0, 4)
   };
 }

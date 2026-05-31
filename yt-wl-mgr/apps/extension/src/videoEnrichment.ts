@@ -4,6 +4,10 @@ export type VideoEnrichmentResult =
   | { ok: true; metadata: EnrichedVideoMetadata }
   | { ok: false; message: string };
 
+export type FetchVideoEnrichmentOptions = {
+  signal?: AbortSignal;
+};
+
 function extractPublishedAt(html: string): string | undefined {
   // ytInitialPlayerResponse > microformat > playerMicroformatRenderer
   const patterns = [
@@ -107,7 +111,10 @@ function inferPrivacyStatus(html: string): PrivacyStatusValue {
   return "public";
 }
 
-export async function fetchVideoEnrichment(videoId: string): Promise<VideoEnrichmentResult> {
+export async function fetchVideoEnrichment(
+  videoId: string,
+  options?: FetchVideoEnrichmentOptions
+): Promise<VideoEnrichmentResult> {
   let html: string;
   let httpStatus: number;
 
@@ -115,12 +122,17 @@ export async function fetchVideoEnrichment(videoId: string): Promise<VideoEnrich
     const response = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
       headers: {
         "Accept-Language": "en-US,en;q=0.9"
-      }
+      },
+      ...(options?.signal ? { signal: options.signal } : {})
     });
 
     httpStatus = response.status;
     html = await response.text();
   } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+
     const message = error instanceof Error ? error.message : "Network request failed";
     return { ok: false, message };
   }
