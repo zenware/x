@@ -1,0 +1,27 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{if .Title}}{{.Title}} · Forge{{else}}Forge{{end}}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <div class="flex min-h-screen">
+    <aside class="w-64 border-r border-slate-800 bg-slate-900 px-5 py-6">
+      <a href="/repos" class="text-2xl font-semibold tracking-tight">Forge</a>
+      <p class="mt-2 text-sm text-slate-400">Personal git/jj forge alpha</p>
+      <nav class="mt-8 space-y-2 text-sm">
+        <a href="/repos" class="block rounded-lg px-3 py-2 hover:bg-slate-800">Repositories</a>
+        <a href="/settings" class="block rounded-lg px-3 py-2 hover:bg-slate-800">Settings</a>
+      </nav>
+    </aside>
+    <main class="flex-1 px-8 py-8">
+      {{block "content" .}}{{end}}
+    </main>
+  </div>
+</body>
+</html>
+{{end}}

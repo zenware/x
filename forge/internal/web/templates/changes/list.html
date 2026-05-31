@@ -1,0 +1,35 @@
+{{define "changes/list.html"}}{{template "layout" .}}{{end}}
+{{define "changes/list.content"}}
+<div class="flex items-center justify-between">
+  <div>
+    <a href="/repos/{{.Repository.Name}}" class="text-sm text-indigo-300 hover:text-indigo-200">← {{.Repository.Name}}</a>
+    <h1 class="mt-2 text-3xl font-semibold">Change requests</h1>
+  </div>
+  <a href="/repos/{{.Repository.Name}}/changes/new" class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400">New change request</a>
+</div>
+<div class="mt-4 flex gap-2 text-sm">
+  <a href="?status=open" class="rounded-lg px-3 py-2 {{if eq .Status "open"}}bg-slate-800{{else}}border border-slate-700{{end}}">Open</a>
+  <a href="?status=merged" class="rounded-lg px-3 py-2 {{if eq .Status "merged"}}bg-slate-800{{else}}border border-slate-700{{end}}">Merged</a>
+  <a href="?status=closed" class="rounded-lg px-3 py-2 {{if eq .Status "closed"}}bg-slate-800{{else}}border border-slate-700{{end}}">Closed</a>
+  <a href="?status=all" class="rounded-lg px-3 py-2 {{if eq .Status "all"}}bg-slate-800{{else}}border border-slate-700{{end}}">All</a>
+</div>
+<div class="mt-8 overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+  <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+    <thead class="bg-slate-950/60 text-slate-400">
+      <tr><th class="px-4 py-3">Number</th><th class="px-4 py-3">Title</th><th class="px-4 py-3">Source → Target</th><th class="px-4 py-3">Status</th></tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800">
+      {{range .ChangeRequests}}
+      <tr class="hover:bg-slate-800/60">
+        <td class="px-4 py-3 font-medium"><a href="/repos/{{$.Repository.Name}}/changes/{{.Number}}" class="text-indigo-300 hover:text-indigo-200">#{{.Number}}</a></td>
+        <td class="px-4 py-3 text-slate-200">{{.Title}}</td>
+        <td class="px-4 py-3 text-slate-400">{{.SourceBookmark}} → {{.TargetBookmark}}</td>
+        <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Status)}}">{{.Status}}</span></td>
+      </tr>
+      {{else}}
+      <tr><td colspan="4" class="px-4 py-10 text-center text-slate-400">No change requests found for this filter.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

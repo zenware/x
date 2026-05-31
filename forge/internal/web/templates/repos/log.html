@@ -1,0 +1,28 @@
+{{define "repos/log.html"}}{{template "layout" .}}{{end}}
+{{define "repos/log.content"}}
+<div class="flex items-center justify-between">
+  <div>
+    <a href="/repos/{{.Repository.Name}}" class="text-sm text-indigo-300 hover:text-indigo-200">← {{.Repository.Name}}</a>
+    <h1 class="mt-2 text-3xl font-semibold">Revision log</h1>
+  </div>
+  <div class="flex gap-2 text-sm">
+    {{if .HasPrevious}}<a href="?page={{sub .Page 1}}" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Previous</a>{{end}}
+    {{if .HasNext}}<a href="?page={{add .Page 1}}" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Next</a>{{end}}
+  </div>
+</div>
+<div class="mt-8 rounded-xl border border-slate-800 bg-slate-900">
+  <div class="divide-y divide-slate-800">
+    {{range .Revisions}}
+    <div class="px-6 py-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <a href="/repos/{{$.Repository.Name}}/rev/{{if .CommitHash}}{{.CommitHash}}{{else}}{{.ChangeID}}{{end}}" class="font-medium text-indigo-300 hover:text-indigo-200">{{.Description}}</a>
+        <span class="text-xs text-slate-500">{{formatTime .Timestamp}}</span>
+      </div>
+      <div class="mt-2 text-xs text-slate-400">{{.Author}} · {{if .CommitHash}}{{shortHash .CommitHash}}{{else}}{{.ChangeID}}{{end}}</div>
+    </div>
+    {{else}}
+    <p class="px-6 py-10 text-sm text-slate-400">No revisions to display.</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

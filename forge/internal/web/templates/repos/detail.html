@@ -1,0 +1,72 @@
+{{define "repos/detail.html"}}{{template "layout" .}}{{end}}
+{{define "repos/detail.content"}}
+{{if .Revision}}
+<div class="space-y-6">
+  <div>
+    <a href="/repos/{{.Repository.Name}}/log" class="text-sm text-indigo-300 hover:text-indigo-200">← Back to revision log</a>
+    <h1 class="mt-2 text-3xl font-semibold">Revision {{if .Revision.CommitHash}}{{shortHash .Revision.CommitHash}}{{else}}{{.Revision.ChangeID}}{{end}}</h1>
+    <p class="mt-2 text-sm text-slate-400">{{.Revision.Author}} · {{formatTime .Revision.Timestamp}}</p>
+  </div>
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+    <h2 class="text-lg font-semibold">Description</h2>
+    <p class="mt-3 whitespace-pre-wrap text-slate-300">{{.Revision.Description}}</p>
+    <div class="mt-4 flex flex-wrap gap-2 text-xs text-slate-400">
+      <span>Commit: {{.Revision.CommitHash}}</span>
+      {{if .Revision.ChangeID}}<span>Change: {{.Revision.ChangeID}}</span>{{end}}
+      {{if .Revision.Bookmarks}}<span>Bookmarks: {{join .Revision.Bookmarks ", "}}</span>{{end}}
+    </div>
+  </section>
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+    <h2 class="text-lg font-semibold">Diff</h2>
+    <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200">{{.Diff}}</pre>
+  </section>
+</div>
+{{else}}
+<div class="space-y-8">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-semibold">{{.Repository.Name}}</h1>
+      <p class="mt-2 text-sm text-slate-400">{{if .Repository.Description}}{{.Repository.Description}}{{else}}No description provided.{{end}}</p>
+      <p class="mt-3 text-xs uppercase tracking-wide text-slate-500">{{.Repository.VCSType}} · {{.Repository.Path}}</p>
+    </div>
+    <div class="flex gap-2 text-sm">
+      <a href="/repos/{{.Repository.Name}}/log" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">View log</a>
+      <a href="/repos/{{.Repository.Name}}/changes" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Change requests</a>
+      <a href="/repos/{{.Repository.Name}}/pipelines" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Pipelines</a>
+    </div>
+  </div>
+  <div class="grid gap-6 lg:grid-cols-3">
+    <section class="rounded-xl border border-slate-800 bg-slate-900 p-6 lg:col-span-2">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Latest revisions</h2>
+        <a href="/repos/{{.Repository.Name}}/log" class="text-sm text-indigo-300 hover:text-indigo-200">View full history</a>
+      </div>
+      <div class="mt-4 divide-y divide-slate-800">
+        {{range .Revisions}}
+        <div class="py-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <a href="/repos/{{$.Repository.Name}}/rev/{{if .CommitHash}}{{.CommitHash}}{{else}}{{.ChangeID}}{{end}}" class="font-medium text-indigo-300 hover:text-indigo-200">{{.Description}}</a>
+            <span class="text-xs text-slate-500">{{formatTime .Timestamp}}</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-400">{{.Author}} · {{if .CommitHash}}{{shortHash .CommitHash}}{{else}}{{.ChangeID}}{{end}}</div>
+        </div>
+        {{else}}
+        <p class="py-8 text-sm text-slate-400">No revisions found.</p>
+        {{end}}
+      </div>
+    </section>
+    <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+      <h2 class="text-lg font-semibold">Bookmarks / branches</h2>
+      <ul class="mt-4 space-y-2 text-sm text-slate-300">
+        {{range .Bookmarks}}
+        <li class="rounded-lg bg-slate-800 px-3 py-2">{{.}}</li>
+        {{else}}
+        <li class="text-slate-400">No bookmarks available.</li>
+        {{end}}
+      </ul>
+      <a href="/repos/{{.Repository.Name}}/tree/HEAD" class="mt-6 inline-flex rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800">Browse files at HEAD</a>
+    </section>
+  </div>
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,34 @@
+{{define "repos/list.html"}}{{template "layout" .}}{{end}}
+{{define "repos/list.content"}}
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="text-3xl font-semibold">Repositories</h1>
+    <p class="mt-2 text-sm text-slate-400">Tracked repositories available for browsing, reviews, and pipelines.</p>
+  </div>
+  <a href="/settings" class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400">Register repository</a>
+</div>
+<div class="mt-8 overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+  <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+    <thead class="bg-slate-950/60 text-slate-400">
+      <tr>
+        <th class="px-4 py-3">Name</th>
+        <th class="px-4 py-3">Description</th>
+        <th class="px-4 py-3">VCS</th>
+        <th class="px-4 py-3">Path</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800">
+      {{range .Repositories}}
+      <tr class="hover:bg-slate-800/60">
+        <td class="px-4 py-3 font-medium"><a href="/repos/{{.Name}}" class="text-indigo-300 hover:text-indigo-200">{{.Name}}</a></td>
+        <td class="px-4 py-3 text-slate-300">{{if .Description}}{{.Description}}{{else}}—{{end}}</td>
+        <td class="px-4 py-3"><span class="rounded-full bg-slate-800 px-2 py-1 text-xs uppercase tracking-wide text-slate-300">{{.VCSType}}</span></td>
+        <td class="px-4 py-3 text-slate-400">{{.Path}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="4" class="px-4 py-10 text-center text-slate-400">No repositories registered yet. Add one from Settings.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

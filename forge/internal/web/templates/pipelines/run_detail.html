@@ -1,0 +1,48 @@
+{{define "pipelines/run_detail.html"}}{{template "layout" .}}{{end}}
+{{define "pipelines/run_detail.content"}}
+<div class="space-y-8">
+  <div>
+    <a href="/repos/{{.Repository.Name}}/pipelines/{{.Pipeline.ID}}/runs" class="text-sm text-indigo-300 hover:text-indigo-200">← Back to runs</a>
+    <h1 class="mt-2 text-3xl font-semibold">{{.Pipeline.Name}} run #{{.Run.ID}}</h1>
+    <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-400">
+      <span>Status: <span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Run.Status)}}">{{.Run.Status}}</span></span>
+      <span>Commit: {{shortHash .Run.CommitHash}}</span>
+      <span>Started: {{formatTimePtr .Run.StartedAt}}</span>
+      <span>Finished: {{formatTimePtr .Run.FinishedAt}}</span>
+    </div>
+  </div>
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+    <h2 class="text-lg font-semibold">Jobs</h2>
+    <div class="mt-4 space-y-4">
+      {{range .Jobs}}
+      <article class="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="font-medium">{{.StepName}}</h3>
+          <span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Status)}}">{{.Status}}</span>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">Started {{formatTimePtr .StartedAt}} · Finished {{formatTimePtr .FinishedAt}}</p>
+        <pre class="mt-3 overflow-x-auto rounded bg-slate-950 p-3 text-xs text-slate-200">{{.LogOutput}}</pre>
+      </article>
+      {{else}}
+      <p class="text-sm text-slate-400">No jobs recorded yet.</p>
+      {{end}}
+    </div>
+  </section>
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+    <h2 class="text-lg font-semibold">Artifacts</h2>
+    <div class="mt-4 space-y-3 text-sm">
+      {{range .Artifacts}}
+      <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-950/60 px-4 py-3">
+        <div>
+          <div class="font-medium text-slate-100">{{.Name}}</div>
+          <div class="text-xs text-slate-500">{{.SizeBytes}} bytes</div>
+        </div>
+        <a href="/repos/{{$.Repository.Name}}/pipelines/{{$.Pipeline.ID}}/runs/{{$.Run.ID}}/artifacts/{{.ID}}" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Download</a>
+      </div>
+      {{else}}
+      <p class="text-sm text-slate-400">No artifacts stored for this run.</p>
+      {{end}}
+    </div>
+  </section>
+</div>
+{{end}}

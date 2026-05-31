@@ -1,0 +1,62 @@
+{{define "settings/index.html"}}{{template "layout" .}}{{end}}
+{{define "settings/index.content"}}
+<div class="grid gap-8 xl:grid-cols-3">
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
+    <h1 class="text-3xl font-semibold">Settings</h1>
+    <dl class="mt-6 space-y-4 text-sm">
+      <div><dt class="text-slate-400">Host</dt><dd class="mt-1 text-slate-200">{{.Host}}</dd></div>
+      <div><dt class="text-slate-400">Port</dt><dd class="mt-1 text-slate-200">{{.Port}}</dd></div>
+      <div><dt class="text-slate-400">Data directory</dt><dd class="mt-1 text-slate-200">{{.DataDir}}</dd></div>
+      <div><dt class="text-slate-400">Repositories</dt><dd class="mt-1 text-slate-200">{{len .Repositories}}</dd></div>
+    </dl>
+    <form method="post" action="/settings/repos" class="mt-8 space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+      <h2 class="text-lg font-semibold">Register repository</h2>
+      <div>
+        <label class="block text-sm font-medium text-slate-300">Name</label>
+        <input type="text" name="name" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300">Description</label>
+        <input type="text" name="description" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300">Absolute path</label>
+        <input type="text" name="path" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm" placeholder="/Users/you/src/project">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300">VCS type</label>
+        <select name="vcs_type" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+          <option value="auto">Auto detect</option>
+          <option value="jj">jj</option>
+          <option value="git">git</option>
+        </select>
+      </div>
+      <button type="submit" class="w-full rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400">Register</button>
+    </form>
+  </section>
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-2">
+    <h2 class="text-lg font-semibold">Registered repositories</h2>
+    <div class="mt-4 overflow-hidden rounded-lg border border-slate-800">
+      <table class="min-w-full divide-y divide-slate-800 text-left text-sm" id="repo-list">
+        <thead class="bg-slate-950/60 text-slate-400">
+          <tr><th class="px-4 py-3">Name</th><th class="px-4 py-3">Path</th><th class="px-4 py-3">VCS</th><th class="px-4 py-3"></th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {{range .Repositories}}
+          <tr class="hover:bg-slate-800/60">
+            <td class="px-4 py-3 font-medium"><a href="/repos/{{.Name}}" class="text-indigo-300 hover:text-indigo-200">{{.Name}}</a></td>
+            <td class="px-4 py-3 text-slate-400">{{.Path}}</td>
+            <td class="px-4 py-3"><span class="rounded-full bg-slate-800 px-2 py-1 text-xs uppercase tracking-wide text-slate-300">{{.VCSType}}</span></td>
+            <td class="px-4 py-3 text-right">
+              <button class="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800" hx-delete="/settings/repos/{{.ID}}" hx-target="closest tr" hx-swap="delete">Remove</button>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="4" class="px-4 py-10 text-center text-slate-400">No repositories registered yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{{end}}
