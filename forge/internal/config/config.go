@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Config struct {
@@ -11,6 +12,7 @@ type Config struct {
 	Port          int
 	DataDir       string
 	AdminPassword string
+	PollInterval  time.Duration
 }
 
 func Load() (*Config, error) {
@@ -19,6 +21,7 @@ func Load() (*Config, error) {
 		Port:          3000,
 		DataDir:       envOrDefault("FORGE_DATA_DIR", "./data"),
 		AdminPassword: envOrDefault("FORGE_ADMIN_PASSWORD", "admin"),
+		PollInterval:  30 * time.Second,
 	}
 
 	if raw := os.Getenv("FORGE_PORT"); raw != "" {
@@ -27,6 +30,14 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("parse FORGE_PORT: %w", err)
 		}
 		cfg.Port = port
+	}
+
+	if raw := os.Getenv("FORGE_POLL_INTERVAL_SECONDS"); raw != "" {
+		seconds, err := strconv.Atoi(raw)
+		if err != nil {
+			return nil, fmt.Errorf("parse FORGE_POLL_INTERVAL_SECONDS: %w", err)
+		}
+		cfg.PollInterval = time.Duration(seconds) * time.Second
 	}
 
 	return cfg, nil

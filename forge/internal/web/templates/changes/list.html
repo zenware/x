@@ -7,6 +7,13 @@
   </div>
   <a href="/repos/{{.Repository.Name}}/changes/new" class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400">New change request</a>
 </div>
+<nav class="mt-6 flex flex-wrap gap-2 text-sm">
+  <a href="/repos/{{.Repository.Name}}" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Overview</a>
+  <a href="/repos/{{.Repository.Name}}/log" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Revisions</a>
+  <a href="/repos/{{.Repository.Name}}/tree/HEAD" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Browse files</a>
+  <a href="/repos/{{.Repository.Name}}/changes" class="rounded-lg bg-slate-800 px-4 py-2 text-slate-100">Change requests</a>
+  <a href="/repos/{{.Repository.Name}}/pipelines" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Pipelines</a>
+</nav>
 <div class="mt-4 flex gap-2 text-sm">
   <a href="?status=open" class="rounded-lg px-3 py-2 {{if eq .Status "open"}}bg-slate-800{{else}}border border-slate-700{{end}}">Open</a>
   <a href="?status=merged" class="rounded-lg px-3 py-2 {{if eq .Status "merged"}}bg-slate-800{{else}}border border-slate-700{{end}}">Merged</a>
@@ -16,18 +23,21 @@
 <div class="mt-8 overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
   <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
     <thead class="bg-slate-950/60 text-slate-400">
-      <tr><th class="px-4 py-3">Number</th><th class="px-4 py-3">Title</th><th class="px-4 py-3">Source → Target</th><th class="px-4 py-3">Status</th></tr>
+      <tr><th class="px-4 py-3">Number</th><th class="px-4 py-3">Title</th><th class="px-4 py-3">Source → Target</th><th class="px-4 py-3">Review</th><th class="px-4 py-3">Rounds</th><th class="px-4 py-3">Open threads</th><th class="px-4 py-3">Status</th></tr>
     </thead>
     <tbody class="divide-y divide-slate-800">
       {{range .ChangeRequests}}
       <tr class="hover:bg-slate-800/60">
-        <td class="px-4 py-3 font-medium"><a href="/repos/{{$.Repository.Name}}/changes/{{.Number}}" class="text-indigo-300 hover:text-indigo-200">#{{.Number}}</a></td>
-        <td class="px-4 py-3 text-slate-200">{{.Title}}</td>
-        <td class="px-4 py-3 text-slate-400">{{.SourceBookmark}} → {{.TargetBookmark}}</td>
-        <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Status)}}">{{.Status}}</span></td>
+        <td class="px-4 py-3 font-medium"><a href="/repos/{{$.Repository.Name}}/changes/{{.Change.Number}}" class="text-indigo-300 hover:text-indigo-200">#{{.Change.Number}}</a></td>
+        <td class="px-4 py-3 text-slate-200">{{.Change.Title}}</td>
+        <td class="px-4 py-3 text-slate-400">{{.Change.SourceBookmark}} → {{.Change.TargetBookmark}}</td>
+        <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass .LatestReviewState}}">{{.LatestReviewState}}</span></td>
+        <td class="px-4 py-3 text-slate-300">{{.RoundCount}}</td>
+        <td class="px-4 py-3 text-slate-300">{{.OpenThreads}}</td>
+        <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Change.Status)}}">{{.Change.Status}}</span></td>
       </tr>
       {{else}}
-      <tr><td colspan="4" class="px-4 py-10 text-center text-slate-400">No change requests found for this filter.</td></tr>
+      <tr><td colspan="7" class="px-4 py-10 text-center text-slate-400">No change requests found for this filter.</td></tr>
       {{end}}
     </tbody>
   </table>

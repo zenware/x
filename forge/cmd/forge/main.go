@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	artifactslocal "github.com/zenware/forge/internal/artifacts/local"
+	"github.com/zenware/forge/internal/automation"
 	cilocal "github.com/zenware/forge/internal/ci/local"
 	"github.com/zenware/forge/internal/config"
 	"github.com/zenware/forge/internal/db"
@@ -33,6 +35,7 @@ func main() {
 
 	artifactStore := artifactslocal.New(cfg.DataDir, database)
 	ciExecutor := cilocal.New(database, artifactStore)
+	automation.NewPoller(database, providers, ciExecutor, log.Default(), cfg.PollInterval).Start(context.Background())
 
 	handler, err := web.New(cfg, database, providers, ciExecutor, artifactStore)
 	if err != nil {

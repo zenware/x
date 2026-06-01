@@ -1,11 +1,12 @@
 {{define "pipelines/run_detail.html"}}{{template "layout" .}}{{end}}
 {{define "pipelines/run_detail.content"}}
-<div class="space-y-8">
+<div id="run-detail" class="space-y-8" {{if or (eq (printf "%s" .Run.Status) "pending") (eq (printf "%s" .Run.Status) "running")}}hx-get="/repos/{{.Repository.Name}}/pipelines/{{.Pipeline.ID}}/runs/{{.Run.ID}}" hx-trigger="every 3s" hx-select="#run-detail" hx-target="#run-detail" hx-swap="outerHTML"{{end}}>
   <div>
     <a href="/repos/{{.Repository.Name}}/pipelines/{{.Pipeline.ID}}/runs" class="text-sm text-indigo-300 hover:text-indigo-200">← Back to runs</a>
     <h1 class="mt-2 text-3xl font-semibold">{{.Pipeline.Name}} run #{{.Run.ID}}</h1>
     <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-400">
       <span>Status: <span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Run.Status)}}">{{.Run.Status}}</span></span>
+      <span>Trigger: {{.Run.TriggerType}}</span>
       <span>Commit: {{shortHash .Run.CommitHash}}</span>
       <span>Started: {{formatTimePtr .Run.StartedAt}}</span>
       <span>Finished: {{formatTimePtr .Run.FinishedAt}}</span>

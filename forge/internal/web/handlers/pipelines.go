@@ -18,6 +18,23 @@ type PipelineListPage struct {
 	Pipelines  []domain.Pipeline
 }
 
+type GlobalPipelinePage struct {
+	LayoutData
+	Repositories []PipelineRepoSummary
+	Runs         []PipelineRunSummary
+}
+
+type PipelineRepoSummary struct {
+	Repository    domain.Repository
+	PipelineCount int
+}
+
+type PipelineRunSummary struct {
+	RepositoryName string
+	PipelineName   string
+	Run            domain.PipelineRun
+}
+
 type PipelineRunsPage struct {
 	LayoutData
 	Repository domain.Repository
@@ -65,6 +82,62 @@ func (a *App) ListPipelines(w http.ResponseWriter, r *http.Request) {
 		pipelines = append(pipelines, pipeline)
 	}
 	a.render(w, "pipelines/list.html", PipelineListPage{LayoutData: LayoutData{Title: repo.Name + " pipelines", ContentTemplate: "pipelines/list.content"}, Repository: repo, Pipelines: pipelines})
+}
+
+func (a *App) GlobalPipelines(w http.ResponseWriter, r *http.Request) {
+	repos, err := a.repositories()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	summaries := make([]PipelineRepoSummary, 0, len(repos))
+	for _, repo := range repos {
+		var count int
+		if err := a.db.QueryRow(`SELECT COUNT(*) FROM pipelines WHERE repo_id = ?`, repo.ID).Scan(&count); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		summaries = append(summaries, PipelineRepoSummary{Repository: repo, PipelineCount: count})
+	}
+
+	rows, err := a.db.Query(`
+		SELECT r.name, p.name, pr.id, pr.pipeline_id, pr.repo_id, pr.status, pr.trigger_type, pr.commit_hash, pr.started_at, pr.finished_at, pr.created_at
+		FROM pipeline_runs pr
+		JOIN repositories r ON r.id = pr.repo_id
+		JOIN pipelines p ON p.id = pr.pipeline_id
+		ORDER BY pr.created_at DESC
+		LIMIT 10`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	recentRuns := make([]PipelineRunSummary, 0)
+	for rows.Next() {
+		var summary PipelineRunSummary
+		var startedAt, finishedAt sql.NullString
+		var createdAt string
+		if err := rows.Scan(&summary.RepositoryName, &summary.PipelineName, &summary.Run.ID, &summary.Run.PipelineID, &summary.Run.RepoID, &summary.Run.Status, &summary.Run.TriggerType, &summary.Run.CommitHash, &startedAt, &finishedAt, &createdAt); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		summary.Run.StartedAt = parseNullableTime(startedAt)
+		summary.Run.FinishedAt = parseNullableTime(finishedAt)
+		summary.Run.CreatedAt = parseTimeString(createdAt)
+		recentRuns = append(recentRuns, summary)
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	a.render(w, "pipelines/global.html", GlobalPipelinePage{
+		LayoutData:   LayoutData{Title: "Pipelines", ContentTemplate: "pipelines/global.content"},
+		Repositories: summaries,
+		Runs:         recentRuns,
+	})
 }
 
 func (a *App) ListRuns(w http.ResponseWriter, r *http.Request) {

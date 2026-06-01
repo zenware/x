@@ -53,7 +53,7 @@ type RepoBlobPage struct {
 }
 
 func (a *App) Home(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/repos", http.StatusFound)
+	http.Redirect(w, r, "/pipelines", http.StatusFound)
 }
 
 func (a *App) ListRepos(w http.ResponseWriter, r *http.Request) {

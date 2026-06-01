@@ -1,0 +1,30 @@
+^D== login ==
+HTTP/1.1 302 Found
+Location: /pipelines
+Set-Cookie: forge_session=authenticated; Path=/; HttpOnly; SameSite=Lax
+Date: Mon, 01 Jun 2026 17:22:06 GMT
+Content-Length: 0
+
+== register repo ==
+HTTP/1.1 302 Found
+Location: /settings
+Date: Mon, 01 Jun 2026 17:22:06 GMT
+Content-Length: 0
+
+
+== repo overview ==
+  <title>demo-release · Forge</title>
+        <a href="/pipelines" class="block rounded-lg px-3 py-2 hover:bg-slate-800">Pipelines</a>
+      <h1 class="text-3xl font-semibold">demo-release</h1>
+      <a href="/repos/demo-release/log" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">View log</a>
+      <a href="/repos/demo-release/tree/HEAD" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Browse files</a>
+
+== trigger pipeline ==
+HTTP/1.1 302 Found
+Location: /repos/demo-release/pipelines/1/runs/1
+Date: Mon, 01 Jun 2026 17:22:06 GMT
+Content-Length: 0
+
+
+== artifact download ==
+demo-artifact

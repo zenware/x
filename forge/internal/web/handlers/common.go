@@ -17,6 +17,7 @@ import (
 	"github.com/zenware/forge/internal/ci"
 	"github.com/zenware/forge/internal/config"
 	"github.com/zenware/forge/internal/domain"
+	"github.com/zenware/forge/internal/pipelines"
 	"github.com/zenware/forge/internal/vcs"
 )
 
@@ -51,7 +52,7 @@ func (a *App) AuthMiddleware(next http.Handler) http.Handler {
 
 func (a *App) LoginPage(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie("forge_session"); err == nil && cookie.Value == "authenticated" {
-		http.Redirect(w, r, "/repos", http.StatusFound)
+		http.Redirect(w, r, "/pipelines", http.StatusFound)
 		return
 	}
 	message := ""
@@ -92,7 +93,7 @@ func (a *App) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: "forge_session", Value: "authenticated", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
-	http.Redirect(w, r, "/repos", http.StatusFound)
+	http.Redirect(w, r, "/pipelines", http.StatusFound)
 }
 
 func (a *App) render(w http.ResponseWriter, name string, data any) {
@@ -150,6 +151,11 @@ func (a *App) repositoryByName(name string) (domain.Repository, error) {
 	return scanRepository(row)
 }
 
+func (a *App) repositoryByID(id int64) (domain.Repository, error) {
+	row := a.db.QueryRow(`SELECT id, name, description, path, vcs_type, created_at, updated_at FROM repositories WHERE id = ?`, id)
+	return scanRepository(row)
+}
+
 func (a *App) providerForRepo(repo domain.Repository) (vcs.Provider, error) {
 	if provider, ok := a.providers[repo.VCSType]; ok {
 		return provider, nil
@@ -169,6 +175,14 @@ func (a *App) detectProvider(repoPath string) (domain.VCSType, error) {
 		return domain.VCSTypeGit, nil
 	}
 	return "", fmt.Errorf("no VCS provider detected for %s", absPath)
+}
+
+func (a *App) syncRepoPipelines(repo domain.Repository) error {
+	definitions, err := pipelines.Load(repo.Path)
+	if err != nil {
+		return err
+	}
+	return pipelines.Sync(a.db, repo.ID, definitions)
 }
 
 func (a *App) pipelineByID(repoID, pipelineID int64) (domain.Pipeline, error) {

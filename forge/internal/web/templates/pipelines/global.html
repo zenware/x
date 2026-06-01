@@ -1,0 +1,65 @@
+{{define "pipelines/global.html"}}{{template "layout" .}}{{end}}
+{{define "pipelines/global.content"}}
+<div class="space-y-8">
+  <div>
+    <h1 class="text-3xl font-semibold">Pipelines</h1>
+    <p class="mt-2 text-sm text-slate-400">Global pipeline overview across all registered repositories.</p>
+  </div>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold">Configured repositories</h2>
+      <a href="/settings" class="text-sm text-indigo-300 hover:text-indigo-200">Manage repositories</a>
+    </div>
+    <div class="mt-4 overflow-hidden rounded-lg border border-slate-800">
+      <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+        <thead class="bg-slate-950/60 text-slate-400">
+          <tr><th class="px-4 py-3">Repository</th><th class="px-4 py-3">Pipelines</th><th class="px-4 py-3"></th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {{range .Repositories}}
+          <tr class="hover:bg-slate-800/60">
+            <td class="px-4 py-3">
+              <div class="font-medium text-slate-100">{{.Repository.Name}}</div>
+              <div class="text-xs text-slate-500">{{.Repository.Path}}</div>
+            </td>
+            <td class="px-4 py-3 text-slate-300">{{.PipelineCount}}</td>
+            <td class="px-4 py-3 text-right">
+              <a href="/repos/{{.Repository.Name}}/pipelines" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Open</a>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="3" class="px-4 py-10 text-center text-slate-400">No repositories registered yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+    <h2 class="text-lg font-semibold">Recent runs</h2>
+    <div class="mt-4 overflow-hidden rounded-lg border border-slate-800">
+      <table class="min-w-full divide-y divide-slate-800 text-left text-sm">
+        <thead class="bg-slate-950/60 text-slate-400">
+          <tr><th class="px-4 py-3">Repository</th><th class="px-4 py-3">Pipeline</th><th class="px-4 py-3">Run</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Created</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {{range .Runs}}
+          <tr class="hover:bg-slate-800/60">
+            <td class="px-4 py-3 text-slate-200">{{.RepositoryName}}</td>
+            <td class="px-4 py-3 text-slate-300">{{.PipelineName}}</td>
+            <td class="px-4 py-3 font-medium">
+              <a href="/repos/{{.RepositoryName}}/pipelines/{{.Run.PipelineID}}/runs/{{.Run.ID}}" class="text-indigo-300 hover:text-indigo-200">Run #{{.Run.ID}}</a>
+            </td>
+            <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Run.Status)}}">{{.Run.Status}}</span></td>
+            <td class="px-4 py-3 text-slate-400">{{formatTime .Run.CreatedAt}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="5" class="px-4 py-10 text-center text-slate-400">No pipeline runs yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{{end}}

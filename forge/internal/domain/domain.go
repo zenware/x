@@ -149,12 +149,14 @@ type ReviewComment struct {
 	ID         int64
 	RoundID    int64
 	CRID       int64
+	ParentID   *int64
 	FilePath   string
 	LineNumber int
 	Side       string // "old" or "new"
 	Body       string
 	Author     string
 	Resolved   bool
+	Outdated   bool
 	CreatedAt  time.Time
 }
 

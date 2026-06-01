@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ type SettingsPage struct {
 	Host         string
 	Port         int
 	DataDir      string
+	PollInterval string
 }
 
 func (a *App) Settings(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +28,7 @@ func (a *App) Settings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.render(w, "settings/index.html", SettingsPage{LayoutData: LayoutData{Title: "Settings", ContentTemplate: "settings/index.content"}, Repositories: repos, Host: a.cfg.Host, Port: a.cfg.Port, DataDir: a.cfg.DataDir})
+	a.render(w, "settings/index.html", SettingsPage{LayoutData: LayoutData{Title: "Settings", ContentTemplate: "settings/index.content"}, Repositories: repos, Host: a.cfg.Host, Port: a.cfg.Port, DataDir: a.cfg.DataDir, PollInterval: a.cfg.PollInterval.String()})
 }
 
 func (a *App) RegisterRepo(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +66,38 @@ func (a *App) RegisterRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := a.db.Exec(`INSERT INTO repositories (name, description, path, vcs_type) VALUES (?, ?, ?, ?)`, name, description, absPath, vcsType); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	repo, err := a.repositoryByName(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := a.syncRepoPipelines(repo); err != nil {
+		_, _ = a.db.Exec(`DELETE FROM repositories WHERE id = ?`, repo.ID)
+		http.Error(w, fmt.Sprintf("repository registered but pipeline sync failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/settings", http.StatusFound)
+}
+
+func (a *App) SyncRepo(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid repository id", http.StatusBadRequest)
+		return
+	}
+	repo, err := a.repositoryByID(id)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if err == sql.ErrNoRows {
+			status = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+	if err := a.syncRepoPipelines(repo); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

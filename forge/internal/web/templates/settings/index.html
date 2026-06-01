@@ -7,10 +7,12 @@
       <div><dt class="text-slate-400">Host</dt><dd class="mt-1 text-slate-200">{{.Host}}</dd></div>
       <div><dt class="text-slate-400">Port</dt><dd class="mt-1 text-slate-200">{{.Port}}</dd></div>
       <div><dt class="text-slate-400">Data directory</dt><dd class="mt-1 text-slate-200">{{.DataDir}}</dd></div>
+      <div><dt class="text-slate-400">Repo poll interval</dt><dd class="mt-1 text-slate-200">{{.PollInterval}}</dd></div>
       <div><dt class="text-slate-400">Repositories</dt><dd class="mt-1 text-slate-200">{{len .Repositories}}</dd></div>
     </dl>
     <form method="post" action="/settings/repos" class="mt-8 space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 p-4">
       <h2 class="text-lg font-semibold">Register repository</h2>
+      <p class="text-sm text-slate-400">Forge imports <code class="rounded bg-slate-900 px-1 py-0.5 text-xs text-slate-300">.forge/pipeline.yml</code> when a repo is registered. Re-run <strong>Sync pipelines</strong> after editing that file.</p>
       <div>
         <label class="block text-sm font-medium text-slate-300">Name</label>
         <input type="text" name="name" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
@@ -48,7 +50,12 @@
             <td class="px-4 py-3 text-slate-400">{{.Path}}</td>
             <td class="px-4 py-3"><span class="rounded-full bg-slate-800 px-2 py-1 text-xs uppercase tracking-wide text-slate-300">{{.VCSType}}</span></td>
             <td class="px-4 py-3 text-right">
-              <button class="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800" hx-delete="/settings/repos/{{.ID}}" hx-target="closest tr" hx-swap="delete">Remove</button>
+              <div class="flex justify-end gap-2">
+                <form method="post" action="/settings/repos/{{.ID}}/sync">
+                  <button class="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800">Sync pipelines</button>
+                </form>
+                <button class="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800" hx-delete="/settings/repos/{{.ID}}" hx-target="closest tr" hx-swap="delete">Remove</button>
+              </div>
             </td>
           </tr>
           {{else}}

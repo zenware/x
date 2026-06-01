@@ -7,15 +7,152 @@
     <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-400">
       <span>{{.Change.SourceBookmark}} → {{.Change.TargetBookmark}}</span>
       <span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Change.Status)}}">{{.Change.Status}}</span>
-      {{if .Round}}<span>Review round {{.Round.RoundNum}} · {{.Round.TipCommit}}</span>{{end}}
+      {{if .Round}}<span>Review round {{.Round.RoundNum}} · {{shortHash .Round.TipCommit}}</span>{{end}}
+      <span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass .CurrentState}}">{{.CurrentState}}</span>
     </div>
     {{if .Change.Description}}<p class="mt-4 max-w-3xl whitespace-pre-wrap text-slate-300">{{.Change.Description}}</p>{{end}}
+    {{if .RoundAdvanced}}
+    <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+      The source bookmark moved forward, so Forge created a new review round and marked unresolved older comments as outdated.
+    </div>
+    {{end}}
   </div>
+
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="/repos/{{.Repository.Name}}" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Overview</a>
+    <a href="/repos/{{.Repository.Name}}/changes" class="rounded-lg bg-slate-800 px-4 py-2 text-slate-100">Change requests</a>
+    <a href="/repos/{{.Repository.Name}}/pipelines" class="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800">Pipelines</a>
+  </nav>
+
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500">Source bookmark</div>
+      <div class="mt-2 font-medium text-slate-100">{{.Change.SourceBookmark}}</div>
+      {{if .SourceRevision}}
+      <div class="mt-2 text-sm text-slate-400">jj {{if .SourceRevision.ChangeID}}{{.SourceRevision.ChangeID}}{{else}}—{{end}}</div>
+      <div class="text-sm text-slate-500">git {{shortHash .SourceRevision.CommitHash}}</div>
+      {{end}}
+    </div>
+    <div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500">Target bookmark</div>
+      <div class="mt-2 font-medium text-slate-100">{{.Change.TargetBookmark}}</div>
+      {{if .TargetRevision}}
+      <div class="mt-2 text-sm text-slate-400">jj {{if .TargetRevision.ChangeID}}{{.TargetRevision.ChangeID}}{{else}}—{{end}}</div>
+      <div class="text-sm text-slate-500">git {{shortHash .TargetRevision.CommitHash}}</div>
+      {{end}}
+    </div>
+    <div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500">Review rounds</div>
+      <div class="mt-2 flex flex-wrap gap-2">
+        {{range .Rounds}}
+        <a href="?round={{.RoundNum}}" class="rounded-lg px-3 py-2 text-sm {{if and $.Round (eq $.Round.RoundNum .RoundNum)}}bg-indigo-500 text-white{{else}}border border-slate-700 hover:bg-slate-800{{end}}">Round {{.RoundNum}}</a>
+        {{end}}
+      </div>
+    </div>
+    <div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500">Actions</div>
+      <div class="mt-2 flex flex-wrap gap-2">
+        {{if eq (printf "%s" .Change.Status) "open"}}
+        <form method="post" action="/repos/{{.Repository.Name}}/changes/{{.Change.Number}}/close">
+          <button type="submit" class="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800">Close</button>
+        </form>
+        {{else if eq (printf "%s" .Change.Status) "closed"}}
+        <form method="post" action="/repos/{{.Repository.Name}}/changes/{{.Change.Number}}/reopen">
+          <button type="submit" class="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800">Reopen</button>
+        </form>
+        {{end}}
+      </div>
+    </div>
+  </section>
+
   <div class="grid gap-6 lg:grid-cols-3">
     <section class="rounded-xl border border-slate-800 bg-slate-900 p-6 lg:col-span-2">
       <h2 class="text-lg font-semibold">Diff</h2>
-      <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200">{{.Diff}}</pre>
+      <div class="mt-4 space-y-6">
+        {{range .DiffFiles}}
+        {{$filePath := .Path}}
+        <article class="overflow-hidden rounded-lg border border-slate-800">
+          <header class="border-b border-slate-800 bg-slate-950/80 px-4 py-3 text-sm font-medium text-slate-200">{{$filePath}}</header>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
+              <tbody class="divide-y divide-slate-800">
+                {{range .Lines}}
+                <tr class="{{if eq .Prefix "+"}}bg-emerald-500/5{{else if eq .Prefix "-"}}bg-rose-500/5{{else}}bg-slate-950/40{{end}}">
+                  <td class="w-12 px-2 py-2 text-right text-slate-500">{{if .OldNumber}}{{.OldNumber}}{{end}}</td>
+                  <td class="w-12 px-2 py-2 text-right text-slate-500">{{if .NewNumber}}{{.NewNumber}}{{end}}</td>
+                  <td class="w-10 px-2 py-2 text-center text-slate-500">{{.Prefix}}</td>
+                  <td class="whitespace-pre-wrap px-2 py-2 font-mono text-slate-200">{{.Content}}</td>
+                  <td class="w-24 px-2 py-2 text-right">
+                    {{if .Commentable}}
+                    <details>
+                      <summary class="cursor-pointer rounded border border-slate-700 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800">+</summary>
+                      <form method="post" action="/repos/{{$.Repository.Name}}/changes/{{$.Change.Number}}/comments" class="mt-2 space-y-2 rounded-lg border border-slate-700 bg-slate-950 p-3">
+                        <input type="hidden" name="file_path" value="{{$filePath}}">
+                        <input type="hidden" name="side" value="{{.Side}}">
+                        <input type="hidden" name="line_number" value="{{if eq .Side "old"}}{{.OldNumber}}{{else}}{{.NewNumber}}{{end}}">
+                        <textarea name="body" rows="3" class="w-72 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100" placeholder="Leave a comment on this line"></textarea>
+                        <button type="submit" class="w-full rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800">Add comment</button>
+                      </form>
+                    </details>
+                    {{end}}
+                  </td>
+                </tr>
+                {{range .Threads}}
+                <tr class="bg-slate-950/80">
+                  <td colspan="5" class="px-4 py-3">
+                    <div class="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span class="font-medium text-slate-200">{{.Root.Author}}</span>
+                        <span>Round {{.RoundNum}}</span>
+                        <span>{{formatTime .Root.CreatedAt}}</span>
+                        {{if .Root.Outdated}}<span class="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-700">Outdated</span>{{end}}
+                        {{if .Root.Resolved}}<span class="rounded-full bg-emerald-100 px-2 py-1 font-medium text-emerald-700">Resolved</span>{{end}}
+                      </div>
+                      <p class="mt-3 whitespace-pre-wrap text-sm text-slate-300">{{.Root.Body}}</p>
+                      <div class="mt-4 space-y-3">
+                        {{range .Replies}}
+                        <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-3">
+                          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                            <span class="font-medium text-slate-200">{{.Author}}</span>
+                            <span>{{formatTime .CreatedAt}}</span>
+                            {{if .Outdated}}<span class="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-700">Outdated</span>{{end}}
+                          </div>
+                          <p class="mt-2 whitespace-pre-wrap text-sm text-slate-300">{{.Body}}</p>
+                        </div>
+                        {{end}}
+                      </div>
+                      <div class="mt-4 flex flex-wrap gap-3">
+                        <details class="flex-1">
+                          <summary class="cursor-pointer rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800">Reply</summary>
+                          <form method="post" action="/repos/{{$.Repository.Name}}/changes/{{$.Change.Number}}/comments" class="mt-3 space-y-2">
+                            <input type="hidden" name="file_path" value="{{.Root.FilePath}}">
+                            <input type="hidden" name="side" value="{{.Root.Side}}">
+                            <input type="hidden" name="line_number" value="{{.Root.LineNumber}}">
+                            <input type="hidden" name="parent_id" value="{{.Root.ID}}">
+                            <textarea name="body" rows="3" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm" placeholder="Reply to this thread"></textarea>
+                            <button type="submit" class="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800">Reply</button>
+                          </form>
+                        </details>
+                        <form method="post" action="/repos/{{$.Repository.Name}}/changes/{{$.Change.Number}}/comments/{{.Root.ID}}/resolve">
+                          <input type="hidden" name="resolved" value="{{if .Root.Resolved}}0{{else}}1{{end}}">
+                          <button type="submit" class="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800">{{if .Root.Resolved}}Unresolve{{else}}Resolve{{end}}</button>
+                        </form>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {{end}}
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        </article>
+        {{else}}
+        <div class="rounded-lg border border-dashed border-slate-700 bg-slate-950/40 px-4 py-10 text-center text-sm text-slate-400">No diff available for this change request.</div>
+        {{end}}
+      </div>
     </section>
+
     <section class="space-y-6">
       <div class="rounded-xl border border-slate-800 bg-slate-900 p-6">
         <h2 class="text-lg font-semibold">Submit review</h2>
@@ -29,60 +166,68 @@
           <button type="submit" class="w-full rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400">Submit review</button>
         </form>
       </div>
+
       <div class="rounded-xl border border-slate-800 bg-slate-900 p-6">
-        <h2 class="text-lg font-semibold">Add line comment</h2>
-        <form method="post" action="/repos/{{.Repository.Name}}/changes/{{.Change.Number}}/comments" class="mt-4 space-y-3">
-          <input type="text" name="file_path" placeholder="path/to/file.go" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
-          <input type="number" min="1" name="line_number" placeholder="Line number" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
-          <select name="side" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
-            <option value="new">New</option>
-            <option value="old">Old</option>
-          </select>
-          <textarea name="body" rows="4" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm" placeholder="Comment body"></textarea>
-          <button type="submit" class="w-full rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800">Add comment</button>
-        </form>
+        <h2 class="text-lg font-semibold">Review workflow</h2>
+        <div class="mt-4 space-y-3 text-sm text-slate-400">
+          <p>Use the <span class="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-200">+</span> controls in the diff to leave line comments.</p>
+          <p>Reply to a thread directly from the diff or the thread list, then resolve it when the issue is addressed.</p>
+          <p>Older unresolved comments stay visible across amended or rebased `jj` changes and are marked outdated when a new round is created.</p>
+        </div>
       </div>
     </section>
   </div>
+
   <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
     <h2 class="text-lg font-semibold">Reviews</h2>
     <div class="mt-4 space-y-4">
       {{range .Reviews}}
       <article class="rounded-lg bg-slate-950/60 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="font-medium">{{.Author}}</div>
-          <span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .State)}}">{{.State}}</span>
+          <div class="font-medium">{{.Review.Author}}</div>
+          <span class="rounded-full px-2 py-1 text-xs font-medium {{statusClass (printf "%s" .Review.State)}}">{{.Review.State}}</span>
         </div>
-        {{if .Body}}<p class="mt-3 whitespace-pre-wrap text-sm text-slate-300">{{.Body}}</p>{{end}}
-        <p class="mt-3 text-xs text-slate-500">{{formatTime .CreatedAt}}</p>
+        <p class="mt-2 text-xs text-slate-500">Round {{.RoundNum}}</p>
+        {{if .Review.Body}}<p class="mt-3 whitespace-pre-wrap text-sm text-slate-300">{{.Review.Body}}</p>{{end}}
+        <p class="mt-3 text-xs text-slate-500">{{formatTime .Review.CreatedAt}}</p>
       </article>
       {{else}}
       <p class="text-sm text-slate-400">No reviews yet.</p>
       {{end}}
     </div>
   </section>
+
   <section class="rounded-xl border border-slate-800 bg-slate-900 p-6">
-    <h2 class="text-lg font-semibold">Line comments</h2>
+    <h2 class="text-lg font-semibold">Threads</h2>
     <div class="mt-4 space-y-4">
       {{range .Comments}}
       <article class="rounded-lg bg-slate-950/60 p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div class="font-medium text-slate-100">{{.FilePath}}:{{.LineNumber}} ({{.Side}})</div>
-            <p class="mt-1 text-xs text-slate-500">{{.Author}} · {{formatTime .CreatedAt}}</p>
+            <div class="font-medium text-slate-100">{{.Root.FilePath}}:{{.Root.LineNumber}} ({{.Root.Side}})</div>
+            <p class="mt-1 text-xs text-slate-500">{{.Root.Author}} · round {{.RoundNum}} · {{formatTime .Root.CreatedAt}}</p>
           </div>
-          {{if .Resolved}}
-          <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">Resolved</span>
-          {{else}}
-          <form method="post" action="/repos/{{$.Repository.Name}}/changes/{{$.Change.Number}}/comments/{{.ID}}/resolve">
-            <button type="submit" class="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800">Resolve</button>
+          <form method="post" action="/repos/{{$.Repository.Name}}/changes/{{$.Change.Number}}/comments/{{.Root.ID}}/resolve">
+            <input type="hidden" name="resolved" value="{{if .Root.Resolved}}0{{else}}1{{end}}">
+            <button type="submit" class="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:bg-slate-800">{{if .Root.Resolved}}Unresolve{{else}}Resolve{{end}}</button>
           </form>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          {{if .Root.Resolved}}<span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">Resolved</span>{{end}}
+          {{if .Root.Outdated}}<span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">Outdated</span>{{end}}
+        </div>
+        <p class="mt-3 whitespace-pre-wrap text-sm text-slate-300">{{.Root.Body}}</p>
+        <div class="mt-4 space-y-3">
+          {{range .Replies}}
+          <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-3">
+            <div class="text-xs text-slate-500">{{.Author}} · {{formatTime .CreatedAt}}</div>
+            <p class="mt-2 whitespace-pre-wrap text-sm text-slate-300">{{.Body}}</p>
+          </div>
           {{end}}
         </div>
-        <p class="mt-3 whitespace-pre-wrap text-sm text-slate-300">{{.Body}}</p>
       </article>
       {{else}}
-      <p class="text-sm text-slate-400">No line comments yet.</p>
+      <p class="text-sm text-slate-400">No discussion threads yet.</p>
       {{end}}
     </div>
   </section>
