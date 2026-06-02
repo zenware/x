@@ -1,6 +1,7 @@
 package web
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,49 +21,36 @@ import (
 	"github.com/zenware/forge/internal/config"
 	"github.com/zenware/forge/internal/db"
 	"github.com/zenware/forge/internal/domain"
+	"github.com/zenware/forge/internal/testutil"
 	gitvcs "github.com/zenware/forge/internal/vcs/git"
 	jjvcs "github.com/zenware/forge/internal/vcs/jj"
 )
 
 func TestEndToEndRegisterBrowseRunAndDownloadArtifact(t *testing.T) {
-	restoreWD := chdirToProjectRoot(t)
-	defer restoreWD()
-
-	dataDir := t.TempDir()
-	database, err := db.Open(dataDir)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	defer database.Close()
-
+	fixture := newServerFixture(t)
 	repoDir := createGitRepo(t)
-	cfg := &config.Config{Host: "127.0.0.1", Port: 3000, DataDir: dataDir, AdminPassword: "admin", PollInterval: 0}
-	providers := map[domain.VCSType]VCSProvider{
-		domain.VCSTypeJJ:  jjvcs.New(),
-		domain.VCSTypeGit: gitvcs.New(),
-	}
-	store := artifactslocal.New(dataDir, database)
-	executor := cilocal.New(database, store)
-	handler, err := New(cfg, database, providers, executor, store)
-	if err != nil {
-		t.Fatalf("build handler: %v", err)
-	}
 
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: jar}
-
-	loginResp, err := client.PostForm(server.URL+"/login", url.Values{
-		"password": {"admin"},
+	loginResp, err := fixture.Client.PostForm(fixture.Server.URL+"/login", url.Values{
+		"password": {fixture.Password},
 	})
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
+	if loginResp.Request.URL.Path != "/settings/password" {
+		t.Fatalf("expected first login to redirect to password change page, got %s", loginResp.Request.URL.Path)
+	}
 	loginResp.Body.Close()
 
-	registerResp, err := client.PostForm(server.URL+"/settings/repos", url.Values{
+	changeResp, err := fixture.Client.PostForm(fixture.Server.URL+"/settings/password", url.Values{
+		"password":         {"forge-test-password"},
+		"confirm_password": {"forge-test-password"},
+	})
+	if err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	changeResp.Body.Close()
+
+	registerResp, err := fixture.Client.PostForm(fixture.Server.URL+"/settings/repos", url.Values{
 		"name":        {"demo"},
 		"description": {"demo repo"},
 		"path":        {repoDir},
@@ -72,22 +60,22 @@ func TestEndToEndRegisterBrowseRunAndDownloadArtifact(t *testing.T) {
 	}
 	registerResp.Body.Close()
 
-	body := getBody(t, client, server.URL+"/repos/demo")
+	body := getBody(t, fixture.Client, fixture.Server.URL+"/repos/demo")
 	if !strings.Contains(body, "demo") || !strings.Contains(body, "Pipelines") {
 		t.Fatalf("repo detail did not render expected content: %s", body)
 	}
 
-	pipelineBody := getBody(t, client, server.URL+"/repos/demo/pipelines")
+	pipelineBody := getBody(t, fixture.Client, fixture.Server.URL+"/repos/demo/pipelines")
 	if !strings.Contains(pipelineBody, "default") {
 		t.Fatalf("pipeline list missing imported pipeline: %s", pipelineBody)
 	}
 
 	var pipelineID int64
-	if err := database.QueryRow(`SELECT id FROM pipelines WHERE repo_id = (SELECT id FROM repositories WHERE name = 'demo') LIMIT 1`).Scan(&pipelineID); err != nil {
+	if err := fixture.Database.QueryRow(`SELECT id FROM pipelines WHERE repo_id = (SELECT id FROM repositories WHERE name = 'demo') LIMIT 1`).Scan(&pipelineID); err != nil {
 		t.Fatalf("load pipeline id: %v", err)
 	}
 
-	triggerResp, err := client.PostForm(server.URL+fmt.Sprintf("/repos/demo/pipelines/%d/trigger", pipelineID), url.Values{})
+	triggerResp, err := fixture.Client.PostForm(fixture.Server.URL+fmt.Sprintf("/repos/demo/pipelines/%d/trigger", pipelineID), url.Values{})
 	if err != nil {
 		t.Fatalf("trigger pipeline: %v", err)
 	}
@@ -96,10 +84,10 @@ func TestEndToEndRegisterBrowseRunAndDownloadArtifact(t *testing.T) {
 	var runID int64
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		err := database.QueryRow(`SELECT id FROM pipeline_runs WHERE pipeline_id = ? ORDER BY id DESC LIMIT 1`, pipelineID).Scan(&runID)
+		err := fixture.Database.QueryRow(`SELECT id FROM pipeline_runs WHERE pipeline_id = ? ORDER BY id DESC LIMIT 1`, pipelineID).Scan(&runID)
 		if err == nil && runID > 0 {
 			var status string
-			if err := database.QueryRow(`SELECT status FROM pipeline_runs WHERE id = ?`, runID).Scan(&status); err != nil {
+			if err := fixture.Database.QueryRow(`SELECT status FROM pipeline_runs WHERE id = ?`, runID).Scan(&status); err != nil {
 				t.Fatalf("load run status: %v", err)
 			}
 			if status == string(domain.RunStatusPassed) {
@@ -112,16 +100,16 @@ func TestEndToEndRegisterBrowseRunAndDownloadArtifact(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	runBody := getBody(t, client, server.URL+fmt.Sprintf("/repos/demo/pipelines/%d/runs/%d", pipelineID, runID))
+	runBody := getBody(t, fixture.Client, fixture.Server.URL+fmt.Sprintf("/repos/demo/pipelines/%d/runs/%d", pipelineID, runID))
 	if !strings.Contains(runBody, "run #") || !strings.Contains(runBody, "artifact.txt") {
 		t.Fatalf("run detail missing run data or artifact link: %s", runBody)
 	}
 
 	var artifactID int64
-	if err := database.QueryRow(`SELECT id FROM artifacts WHERE run_id = ? LIMIT 1`, runID).Scan(&artifactID); err != nil {
+	if err := fixture.Database.QueryRow(`SELECT id FROM artifacts WHERE run_id = ? LIMIT 1`, runID).Scan(&artifactID); err != nil {
 		t.Fatalf("load artifact id: %v", err)
 	}
-	artifactResp, err := client.Get(server.URL + fmt.Sprintf("/repos/demo/pipelines/%d/runs/%d/artifacts/%d", pipelineID, runID, artifactID))
+	artifactResp, err := fixture.Client.Get(fixture.Server.URL + fmt.Sprintf("/repos/demo/pipelines/%d/runs/%d/artifacts/%d", pipelineID, runID, artifactID))
 	if err != nil {
 		t.Fatalf("download artifact: %v", err)
 	}
@@ -129,6 +117,81 @@ func TestEndToEndRegisterBrowseRunAndDownloadArtifact(t *testing.T) {
 	content, _ := io.ReadAll(artifactResp.Body)
 	if strings.TrimSpace(string(content)) != "alpha-artifact" {
 		t.Fatalf("unexpected artifact content: %q", string(content))
+	}
+}
+
+func TestGeneratedPasswordMustBeChangedBeforeProtectedRoutes(t *testing.T) {
+	fixture := newServerFixture(t)
+
+	loginResp, err := fixture.Client.PostForm(fixture.Server.URL+"/login", url.Values{
+		"password": {fixture.Password},
+	})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	defer loginResp.Body.Close()
+
+	if loginResp.Request.URL.Path != "/settings/password" {
+		t.Fatalf("expected password change page after login, got %s", loginResp.Request.URL.Path)
+	}
+
+	settingsBody := getBody(t, fixture.Client, fixture.Server.URL+"/settings")
+	if !strings.Contains(settingsBody, "Change admin password") {
+		t.Fatalf("expected protected route to keep redirecting to password change page, got %s", settingsBody)
+	}
+}
+
+type serverFixture struct {
+	Server   *httptest.Server
+	Client   *http.Client
+	Database *sql.DB
+	Password string
+}
+
+func newServerFixture(t *testing.T) *serverFixture {
+	t.Helper()
+
+	restoreWD := chdirToProjectRoot(t)
+	t.Cleanup(restoreWD)
+
+	dataDir := t.TempDir()
+	database, err := db.Open(dataDir)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = database.Close()
+	})
+
+	passwordFixture := testutil.CaptureGeneratedAdminPassword(t, dataDir)
+	cfg := &config.Config{
+		Host:                    "127.0.0.1",
+		Port:                    3000,
+		DataDir:                 dataDir,
+		AdminPassword:           passwordFixture.Password,
+		AdminPasswordMustChange: passwordFixture.Credentials.MustChangePassword,
+		PollInterval:            0,
+	}
+	providers := map[domain.VCSType]VCSProvider{
+		domain.VCSTypeJJ:  jjvcs.New(),
+		domain.VCSTypeGit: gitvcs.New(),
+	}
+	store := artifactslocal.New(dataDir, database)
+	executor := cilocal.New(database, store)
+	handler, err := New(cfg, database, providers, executor, store)
+	if err != nil {
+		t.Fatalf("build handler: %v", err)
+	}
+
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	jar, _ := cookiejar.New(nil)
+	return &serverFixture{
+		Server:   server,
+		Client:   &http.Client{Jar: jar},
+		Database: database,
+		Password: passwordFixture.Password,
 	}
 }
 

@@ -33,6 +33,8 @@ func New(cfg *config.Config, db *sql.DB, providers map[domain.VCSType]VCSProvide
 	r.Post("/login", app.Login)
 	protected := chi.NewRouter()
 	protected.Use(app.AuthMiddleware)
+	protected.Get("/settings/password", app.PasswordChangePage)
+	protected.Post("/settings/password", app.ChangePassword)
 	protected.Get("/", app.Home)
 	protected.Get("/pipelines", app.GlobalPipelines)
 	protected.Get("/settings", app.Settings)

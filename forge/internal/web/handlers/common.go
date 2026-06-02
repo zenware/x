@@ -14,11 +14,18 @@ import (
 	"time"
 
 	"github.com/zenware/forge/internal/artifacts"
+	"github.com/zenware/forge/internal/auth"
 	"github.com/zenware/forge/internal/ci"
 	"github.com/zenware/forge/internal/config"
 	"github.com/zenware/forge/internal/domain"
 	"github.com/zenware/forge/internal/pipelines"
 	"github.com/zenware/forge/internal/vcs"
+)
+
+const (
+	sessionCookieName             = "forge_session"
+	sessionAuthenticated          = "authenticated"
+	sessionPasswordChangeRequired = "password-change-required"
 )
 
 type App struct {
@@ -41,9 +48,16 @@ func New(db *sql.DB, templates *template.Template, cfg *config.Config, providers
 
 func (a *App) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("forge_session")
-		if err != nil || cookie.Value != "authenticated" {
+		session := a.normalizedSessionValue(cookieValue(r))
+		if session == "" {
 			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		if session != cookieValue(r) {
+			http.SetCookie(w, sessionCookie(session))
+		}
+		if session == sessionPasswordChangeRequired && r.URL.Path != "/settings/password" {
+			http.Redirect(w, r, "/settings/password", http.StatusFound)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -51,8 +65,14 @@ func (a *App) AuthMiddleware(next http.Handler) http.Handler {
 }
 
 func (a *App) LoginPage(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie("forge_session"); err == nil && cookie.Value == "authenticated" {
+	switch a.normalizedSessionValue(cookieValue(r)) {
+	case sessionAuthenticated:
+		http.SetCookie(w, sessionCookie(sessionAuthenticated))
 		http.Redirect(w, r, "/pipelines", http.StatusFound)
+		return
+	case sessionPasswordChangeRequired:
+		http.SetCookie(w, sessionCookie(sessionPasswordChangeRequired))
+		http.Redirect(w, r, "/settings/password", http.StatusFound)
 		return
 	}
 	message := ""
@@ -92,8 +112,103 @@ func (a *App) Login(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?error=1", http.StatusFound)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: "forge_session", Value: "authenticated", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	destination := "/pipelines"
+	session := sessionAuthenticated
+	if a.cfg.AdminPasswordMustChange {
+		destination = "/settings/password"
+		session = sessionPasswordChangeRequired
+	}
+	http.SetCookie(w, sessionCookie(session))
+	http.Redirect(w, r, destination, http.StatusFound)
+}
+
+func (a *App) PasswordChangePage(w http.ResponseWriter, r *http.Request) {
+	if !a.cfg.AdminPasswordMustChange {
+		http.Redirect(w, r, "/settings", http.StatusFound)
+		return
+	}
+	message := ""
+	if r.URL.Query().Get("error") != "" {
+		message = `<p class="mb-4 rounded bg-rose-100 px-3 py-2 text-sm text-rose-700">Enter a non-empty password and confirm it exactly.</p>`
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = fmt.Fprintf(w, `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Change Forge Password</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <div class="mx-auto flex min-h-screen max-w-md items-center px-6">
+    <form method="post" action="/settings/password" class="w-full rounded-xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+      <h1 class="text-2xl font-semibold">Change admin password</h1>
+      <p class="mt-2 text-sm text-slate-400">Forge generated a one-time bootstrap password. Choose a new password before continuing.</p>
+      %s
+      <label class="mt-6 block text-sm font-medium text-slate-300">New password</label>
+      <input type="password" name="password" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none" autofocus>
+      <label class="mt-4 block text-sm font-medium text-slate-300">Confirm password</label>
+      <input type="password" name="confirm_password" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none">
+      <button type="submit" class="mt-6 w-full rounded-lg bg-indigo-500 px-4 py-2 font-medium text-white hover:bg-indigo-400">Update password</button>
+    </form>
+  </div>
+</body>
+</html>`, message)
+}
+
+func (a *App) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if !a.cfg.AdminPasswordMustChange {
+		http.Redirect(w, r, "/settings", http.StatusFound)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	password := r.FormValue("password")
+	if strings.TrimSpace(password) == "" || password != r.FormValue("confirm_password") {
+		http.Redirect(w, r, "/settings/password?error=1", http.StatusFound)
+		return
+	}
+	if err := auth.UpdatePassword(a.cfg.DataDir, password); err != nil {
+		http.Error(w, fmt.Sprintf("update admin password: %v", err), http.StatusInternalServerError)
+		return
+	}
+	a.cfg.AdminPassword = password
+	a.cfg.AdminPasswordMustChange = false
+	http.SetCookie(w, sessionCookie(sessionAuthenticated))
 	http.Redirect(w, r, "/pipelines", http.StatusFound)
+}
+
+func (a *App) normalizedSessionValue(value string) string {
+	switch value {
+	case sessionAuthenticated, sessionPasswordChangeRequired:
+		if a.cfg.AdminPasswordMustChange {
+			return sessionPasswordChangeRequired
+		}
+		return sessionAuthenticated
+	default:
+		return ""
+	}
+}
+
+func cookieValue(r *http.Request) string {
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
+}
+
+func sessionCookie(value string) *http.Cookie {
+	return &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
 }
 
 func (a *App) render(w http.ResponseWriter, name string, data any) {

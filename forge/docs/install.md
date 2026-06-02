@@ -27,8 +27,9 @@ Forge is currently a single-user, self-hosted alpha focused on local repositorie
 
 4. Sign in with the single-user alpha password:
 
-   - default password: `admin`
-   - override with `FORGE_ADMIN_PASSWORD`
+   - by default Forge generates a one-time bootstrap password on first run and prints it to the console
+   - the generated password must be changed immediately after the first successful login
+   - override with `FORGE_ADMIN_PASSWORD` if you want to provide the password up front
 
 ## Configuration
 
@@ -39,7 +40,7 @@ Forge uses environment variables:
 | `FORGE_HOST` | `localhost` | Bind host |
 | `FORGE_PORT` | `3000` | Bind port |
 | `FORGE_DATA_DIR` | `./data` | SQLite database and artifact storage |
-| `FORGE_ADMIN_PASSWORD` | `admin` | Single-user login password |
+| `FORGE_ADMIN_PASSWORD` | generated on first run | Single-user login password override |
 | `FORGE_POLL_INTERVAL_SECONDS` | `30` | Repository polling interval for automatic CI runs |
 
 Example:

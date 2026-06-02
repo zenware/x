@@ -27,7 +27,7 @@ cd forge
 make run
 ```
 
-Then open `http://localhost:3000/login` and sign in with the default alpha password: `admin`.
+Then open `http://localhost:3000/login`, copy the generated bootstrap password from the Forge console output, and sign in. Forge requires you to change that generated password before continuing. You can still set `FORGE_ADMIN_PASSWORD` to provide your own password up front.
 
 ## Documentation
 
