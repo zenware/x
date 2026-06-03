@@ -3,7 +3,6 @@ let
   gleanRoot = "glean";
   backendDir = "${gleanRoot}/backend";
   frontendDir = "${gleanRoot}/frontend";
-  legacyFrontendDir = "${gleanRoot}/app";
   dbName = "glean";
   dbUser = "glean";
   dbPassword = "glean_dev_password";
@@ -32,9 +31,6 @@ in
 
   # Language runtimes and toolchains.
   languages.go.enable = true;
-  # Avoid custom rust-stable wrapper derivation issues on Darwin by using
-  # pinned rust toolchain packages directly from nixpkgs.
-  languages.rust.enable = false;
   languages.javascript = {
     enable = true;
     package = pkgs.nodejs_22;
@@ -49,11 +45,6 @@ in
     curl
     netcat
     air
-    rustc
-    cargo
-    rustfmt
-    clippy
-    cargo-watch
     golangci-lint
     postgresql_16
     prettier
@@ -123,46 +114,27 @@ in
   processes.backend.exec = ''
     bash -lc '
       set -euo pipefail
-      if [ -f "${backendDir}/go.mod" ]; then
-        cd "${backendDir}"
-        if [ -f ".air.toml" ]; then
-          exec air
-        else
-          exec air -c <(cat <<EOF
-          root = "."
-          tmp_dir = ".air"
-          [build]
-          cmd = "go build -o ./.air/glean-backend ./..."
-          bin = "./.air/glean-backend"
-          include_ext = ["go"]
-          exclude_dir = ["vendor", ".git", ".air"]
-          delay = 300
-          EOF
-          )
-        fi
-      elif [ -f "${backendDir}/Cargo.toml" ]; then
-        cd "${backendDir}"
-        exec cargo watch -x "run"
-      else
+      if [ ! -f "${backendDir}/go.mod" ]; then
         echo "[glean-backend] No backend project found in ${backendDir}."
-        echo "[glean-backend] Create Go (go.mod) or Rust (Cargo.toml) backend and rerun."
+        echo "[glean-backend] Create a Go backend and rerun."
         exec sleep infinity
       fi
+
+      cd "${backendDir}"
+      exec go run .
     '
   '';
 
   processes.frontend.exec = ''
     bash -lc '
       set -euo pipefail
-      if [ -f "${frontendDir}/package.json" ]; then
-        cd "${frontendDir}"
-      elif [ -f "${legacyFrontendDir}/package.json" ]; then
-        cd "${legacyFrontendDir}"
-      else
-        echo "[glean-frontend] No frontend package.json found in ${frontendDir} or ${legacyFrontendDir}."
-        echo "[glean-frontend] Create a Next.js app and rerun."
+      if [ ! -f "${frontendDir}/package.json" ]; then
+        echo "[glean-frontend] No frontend package.json found in ${frontendDir}."
+        echo "[glean-frontend] Create a frontend app and rerun."
         exec sleep infinity
       fi
+
+      cd "${frontendDir}"
 
       corepack enable >/dev/null 2>&1 || true
       if [ -f "pnpm-lock.yaml" ]; then
@@ -171,12 +143,7 @@ in
         pnpm install
       fi
 
-      if jq -e ".scripts.dev" package.json >/dev/null; then
-        exec pnpm dev -- --port "''${GLEAN_FRONTEND_PORT}" --hostname 0.0.0.0
-      else
-        echo "[glean-frontend] package.json is missing scripts.dev"
-        exec sleep infinity
-      fi
+      exec pnpm exec vite --host 0.0.0.0 --port "''${GLEAN_FRONTEND_PORT}"
     '
   '';
 
@@ -203,8 +170,6 @@ in
 
     if [ -f "''${GLEAN_FRONTEND_DIR}/package.json" ]; then
       (cd "''${GLEAN_FRONTEND_DIR}" && corepack enable >/dev/null 2>&1 || true && pnpm install)
-    elif [ -f "''${GLEAN_ROOT}/app/package.json" ]; then
-      (cd "''${GLEAN_ROOT}/app" && corepack enable >/dev/null 2>&1 || true && pnpm install)
     fi
 
     echo "==> Seeding local graph tables with sample entities"
@@ -239,8 +204,6 @@ in
     echo "==> Running Glean backend tests"
     if [ -f "''${GLEAN_BACKEND_DIR}/go.mod" ]; then
       (cd "''${GLEAN_BACKEND_DIR}" && go test ./...)
-    elif [ -f "''${GLEAN_BACKEND_DIR}/Cargo.toml" ]; then
-      (cd "''${GLEAN_BACKEND_DIR}" && cargo test --all --all-features)
     else
       echo "No backend test target found in ''${GLEAN_BACKEND_DIR}; skipping backend tests."
     fi
@@ -250,8 +213,6 @@ in
       (cd "''${GLEAN_FRONTEND_DIR}" && corepack enable >/dev/null 2>&1 || true && pnpm test)
     elif [ -f "''${GLEAN_FRONTEND_DIR}/package.json" ] && jq -e ".scripts[\"test:unit\"]" "''${GLEAN_FRONTEND_DIR}/package.json" >/dev/null; then
       (cd "''${GLEAN_FRONTEND_DIR}" && corepack enable >/dev/null 2>&1 || true && pnpm test:unit)
-    elif [ -f "''${GLEAN_ROOT}/app/package.json" ] && jq -e ".scripts.test" "''${GLEAN_ROOT}/app/package.json" >/dev/null; then
-      (cd "''${GLEAN_ROOT}/app" && corepack enable >/dev/null 2>&1 || true && pnpm test)
     else
       echo "No frontend test script found; skipping frontend tests."
     fi
@@ -272,21 +233,12 @@ in
       pass_filenames = false;
     };
 
-    backend-rust-clippy = {
-      enable = true;
-      name = "backend-rust-clippy";
-      entry = "${pkgs.bash}/bin/bash -lc 'if [ -f ${backendDir}/Cargo.toml ]; then cd ${backendDir} && cargo clippy --all-targets --all-features -- -D warnings; else echo \"skip: no Rust backend\"; fi'";
-      language = "system";
-      files = "^glean/backend/.*\\.rs$";
-      pass_filenames = false;
-    };
-
     frontend-eslint = {
       enable = true;
       name = "frontend-eslint";
-      entry = "${pkgs.bash}/bin/bash -lc 'if [ -f ${frontendDir}/package.json ] && jq -e .scripts.lint ${frontendDir}/package.json >/dev/null; then cd ${frontendDir} && corepack enable >/dev/null 2>&1 || true && pnpm lint; elif [ -f ${legacyFrontendDir}/package.json ] && jq -e .scripts.lint ${legacyFrontendDir}/package.json >/dev/null; then cd ${legacyFrontendDir} && corepack enable >/dev/null 2>&1 || true && pnpm lint; else echo \"skip: no frontend lint script\"; fi'";
+      entry = "${pkgs.bash}/bin/bash -lc 'if [ -f ${frontendDir}/package.json ] && jq -e .scripts.lint ${frontendDir}/package.json >/dev/null; then cd ${frontendDir} && corepack enable >/dev/null 2>&1 || true && pnpm lint; else echo \"skip: no frontend lint script\"; fi'";
       language = "system";
-      files = "^glean/(frontend|app)/.*\\.(ts|tsx|js|jsx)$";
+      files = "^glean/frontend/.*\\.(ts|tsx|js|jsx)$";
       pass_filenames = false;
     };
   };

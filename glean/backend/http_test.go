@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -59,6 +60,64 @@ func TestHealth(t *testing.T) {
 	srv.Routes().ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/health", nil))
 	if res.Code != http.StatusOK {
 		t.Fatalf("health status: %d", res.Code)
+	}
+}
+
+func TestPreflightAndCORS(t *testing.T) {
+	srv := NewServer(NewStore())
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/cases", nil)
+	req.Header.Set("Origin", "http://localhost:3001")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+
+	res := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("preflight status: %d", res.Code)
+	}
+	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3001" {
+		t.Fatalf("allow origin mismatch: %q", got)
+	}
+	if got := res.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type" {
+		t.Fatalf("allow headers mismatch: %q", got)
+	}
+}
+
+func TestDocsAndOpenAPI(t *testing.T) {
+	srv := NewServer(NewStore())
+	h := srv.Routes()
+
+	docsRes := httptest.NewRecorder()
+	h.ServeHTTP(docsRes, httptest.NewRequest(http.MethodGet, "/docs", nil))
+	if docsRes.Code != http.StatusOK {
+		t.Fatalf("docs status: %d", docsRes.Code)
+	}
+	if got := docsRes.Header().Get("Content-Type"); !strings.Contains(got, "text/html") {
+		t.Fatalf("docs content type: %q", got)
+	}
+	if body := docsRes.Body.String(); !strings.Contains(body, "/openapi.json") {
+		t.Fatalf("docs body missing openapi link")
+	}
+
+	specRes := httptest.NewRecorder()
+	h.ServeHTTP(specRes, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))
+	if specRes.Code != http.StatusOK {
+		t.Fatalf("openapi status: %d", specRes.Code)
+	}
+
+	var spec struct {
+		OpenAPI string                    `json:"openapi"`
+		Paths   map[string]map[string]any `json:"paths"`
+	}
+	if err := json.Unmarshal(specRes.Body.Bytes(), &spec); err != nil {
+		t.Fatalf("unmarshal openapi: %v", err)
+	}
+	if spec.OpenAPI == "" {
+		t.Fatalf("missing openapi version")
+	}
+	if _, ok := spec.Paths["/api/v1/cases"]; !ok {
+		t.Fatalf("missing cases path in spec")
 	}
 }
 

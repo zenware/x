@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -20,11 +23,13 @@ func NewServer(store *Store) *Server {
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/docs", s.handleDocs)
+	mux.HandleFunc("/openapi.json", s.handleOpenAPI)
 	mux.HandleFunc("/api/v1/cases", s.handleCases)
 	mux.HandleFunc("/api/v1/cases/", s.handleCaseRoutes)
 	mux.HandleFunc("/api/v1/playbooks/validate", s.handlePlaybookValidate)
 	mux.HandleFunc("/api/v1/runs/", s.handleRunRoutes)
-	return mux
+	return withCORS(mux)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -238,4 +243,67 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func withCORS(next http.Handler) http.Handler {
+	allowedOrigins := loadAllowedOrigins()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		if origin != "" && originAllowed(origin, allowedOrigins) {
+			headers := w.Header()
+			headers.Set("Access-Control-Allow-Origin", origin)
+			headers.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			headers.Set("Access-Control-Max-Age", "600")
+			headers.Add("Vary", "Origin")
+			headers.Add("Vary", "Access-Control-Request-Method")
+			headers.Add("Vary", "Access-Control-Request-Headers")
+			if requestedHeaders := strings.TrimSpace(r.Header.Get("Access-Control-Request-Headers")); requestedHeaders != "" {
+				headers.Set("Access-Control-Allow-Headers", requestedHeaders)
+			} else {
+				headers.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			}
+		}
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func loadAllowedOrigins() map[string]struct{} {
+	allowed := map[string]struct{}{
+		"http://localhost": {},
+		"http://127.0.0.1": {},
+	}
+	for _, raw := range strings.Split(os.Getenv("GLEAN_ALLOWED_ORIGINS"), ",") {
+		origin := strings.TrimSpace(raw)
+		if origin == "" {
+			continue
+		}
+		allowed[origin] = struct{}{}
+	}
+	return allowed
+}
+
+func originAllowed(origin string, allowed map[string]struct{}) bool {
+	if _, ok := allowed[origin]; ok {
+		return true
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "localhost" || host == "127.0.0.1" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
