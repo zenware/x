@@ -17,28 +17,28 @@ test("playlist html fixture produces a representative watch-later snapshot", () 
   assert.equal(scan.pageTitle, "Watch later - YouTube");
   assert.equal(scan.playlistId, "WL");
   assert.equal(scan.playlistTitle, "Watch later");
-  assert.equal(scan.items.length, 100);
+  assert.equal(scan.items.length, 3);
 
   assert.deepEqual(scan.items[0], {
-    videoId: "TzDhdvVg9_c",
-    title: "Calculus at a Fifth Grade Level",
-    channelName: "Lukey B. The Physics G",
-    url: "https://www.youtube.com/watch?v=TzDhdvVg9_c&list=WL&index=1&pp=iAQBsAgC",
-    thumbnailUrl: "https://i.ytimg.com/vi/TzDhdvVg9_c/hqdefault.jpg?sqp=-oaymwEjCNACELwBSFryq4qpAxUIARUAAAAAGAElAADIQj0AgKJDeAE=&rs=AOn4CLDIHjc0QNLs0EJXq1nQrpo_jFsY3w",
-    durationText: "19:53",
-    dateAddedText: "9 years ago"
+    videoId: "dQw4w9WgXcQ",
+    title: "Intro to Bloom Filters",
+    channelName: "Example CS Channel",
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=WL&index=1",
+    thumbnailUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+    durationText: "12:34",
+    dateAddedText: "2 years ago"
   });
 
   assert.deepEqual(scan.items[1], {
-    videoId: "rgaTLrZGlk0",
-    title: "Learn music theory in half an hour.",
-    channelName: "ANDREW HUANG",
-    url: "https://www.youtube.com/watch?v=rgaTLrZGlk0&list=WL&index=2&pp=iAQBsAgC",
-    thumbnailUrl: "https://i.ytimg.com/vi/rgaTLrZGlk0/hqdefault.jpg?sqp=-oaymwEjCNACELwBSFryq4qpAxUIARUAAAAAGAElAADIQj0AgKJDeAE=&rs=AOn4CLA79MBvFDwCEwuGmvYYBwGnNcvUSg",
-    durationText: "31:36",
-    dateAddedText: "6 years ago"
+    videoId: "9bZkp7q19f0",
+    title: "Systems Programming in 30 Minutes",
+    channelName: "Systems Lab",
+    url: "https://www.youtube.com/watch?v=9bZkp7q19f0&list=WL&index=2",
+    thumbnailUrl: "https://i.ytimg.com/vi/9bZkp7q19f0/hqdefault.jpg",
+    durationText: "30:15",
+    dateAddedText: "1 year ago"
   });
 
-  assert.equal(snapshot.itemCount, 100);
+  assert.equal(snapshot.itemCount, 3);
   assert.equal(snapshot.duplicateCount, 0);
 });

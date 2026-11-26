@@ -5,3 +5,5 @@ dist/
 *.tsbuildinfo
 yt-wl-mgr/apps/*/dist/
 yt-wl-mgr/packages/*/dist/
+.DS_Store
+forge/forge
